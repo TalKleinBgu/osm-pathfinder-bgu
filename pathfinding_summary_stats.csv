@@ -1,0 +1,6 @@
+algorithm,distance_meters_mean,distance_meters_std,distance_meters_min,distance_meters_max,time_seconds_mean,time_seconds_std,time_seconds_min,time_seconds_max,traffic_signals_mean,traffic_signals_sum,crossings_mean,crossings_sum,safety_penalties_mean,safety_penalties_std,detour_factor_mean,detour_factor_std
+fastest path (day profile),3270.56,,3270.56,3270.56,2672.24,,2672.24,2672.24,7.0,7,0.0,0,1400.0,,3.77,
+few_lights path (day profile),1749.7,,1749.7,1749.7,1570.54,,1570.54,1570.54,10.0,10,0.0,0,1040.0,,2.02,
+safest path (day profile),1854.04,,1854.04,1854.04,1586.18,,1586.18,1586.18,8.0,8,4.0,4,640.0,,2.14,
+safest path (night profile),2308.84,,2308.84,2308.84,2016.03,,2016.03,2016.03,12.0,12,4.0,4,4320.0,,2.66,
+shortest path (day profile),1749.7,,1749.7,1749.7,1570.54,,1570.54,1570.54,10.0,10,0.0,0,1040.0,,2.02,

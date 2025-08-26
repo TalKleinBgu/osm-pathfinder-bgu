@@ -1,0 +1,593 @@
+<!DOCTYPE html>
+<html>
+<head>
+    
+    <meta http-equiv="content-type" content="text/html; charset=UTF-8" />
+    
+        <script>
+            L_NO_TOUCH = false;
+            L_DISABLE_3D = false;
+        </script>
+    
+    <style>html, body {width: 100%;height: 100%;margin: 0;padding: 0;}</style>
+    <style>#map {position:absolute;top:0;bottom:0;right:0;left:0;}</style>
+    <script src="https://cdn.jsdelivr.net/npm/leaflet@1.9.3/dist/leaflet.js"></script>
+    <script src="https://code.jquery.com/jquery-1.12.4.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.2.2/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/Leaflet.awesome-markers/2.0.2/leaflet.awesome-markers.js"></script>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/leaflet@1.9.3/dist/leaflet.css"/>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.2.2/dist/css/bootstrap.min.css"/>
+    <link rel="stylesheet" href="https://netdna.bootstrapcdn.com/bootstrap/3.0.0/css/bootstrap.min.css"/>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.2.0/css/all.min.css"/>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/Leaflet.awesome-markers/2.0.2/leaflet.awesome-markers.css"/>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/python-visualization/folium/folium/templates/leaflet.awesome.rotate.min.css"/>
+    
+            <meta name="viewport" content="width=device-width,
+                initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+            <style>
+                #map_4ee6691b1c8d759910c4f43473efc59a {
+                    position: relative;
+                    width: 100.0%;
+                    height: 100.0%;
+                    left: 0.0%;
+                    top: 0.0%;
+                }
+                .leaflet-container { font-size: 1rem; }
+            </style>
+        
+</head>
+<body>
+    
+    
+        <style>
+          .tw-card { background:#fff; border:1px solid #e6e6e6; border-radius:12px; box-shadow:0 6px 24px rgba(0,0,0,0.08); }
+          .tw-btn { border:none; border-radius:10px; padding:8px 12px; cursor:pointer; font-weight:600; }
+          .tw-btn-ghost { background:#f6f7fb; color:#1f2a44; }
+          .tw-btn-primary { background:#2c5aa0; color:#fff; }
+          .tw-badge { display:inline-flex; align-items:center; gap:6px; background:#f6f7fb; border:1px solid #e9eaf2; border-radius:999px; padding:3px 10px; font-size:12px; color:#344055; }
+          .tw-row { display:flex; gap:10px; align-items:center; justify-content:space-between; }
+          .tw-muted { color:#667086; }
+          .tw-small { font-size:12px; }
+          .tw-metric { font-size:12px; color:#3b455a; }
+          .tw-h1 { margin:0; font-size:18px; color:#1f2a44; }
+          .tw-h2 { margin:0; font-size:14px; color:#1f2a44; font-weight:700; }
+          .tw-pathcard { margin:10px 0; padding:10px; border-left:5px solid var(--clr); background:#fafbff; border-radius:10px; }
+          .tw-pathline { width:16px; height:4px; border-radius:2px; display:inline-block; background:var(--clr); }
+          .tw-checkbox { transform: translateY(1px); }
+          .tw-hr { border:0; border-top:1px solid #edf0f6; margin:10px 0; }
+          .tw-legend-chip { display:inline-flex; align-items:center; gap:6px; margin:4px 8px 0 0; }
+        </style>
+
+        <div id="paths_legend" class="tw-card" style="
+          position: fixed; top: 10px; right: 10px; width: 380px; max-height: 76vh;
+          overflow:auto; z-index: 9999; padding: 14px;">
+          <div class="tw-row">
+            <h4 class="tw-h1">Building Paths</h4>
+            <div style="display:flex; gap:8px;">
+              <button class="tw-btn tw-btn-ghost" onclick="clearSelectedPath()" title="Clear drawn">Clear</button>
+            </div>
+          </div>
+
+          <div class="tw-small tw-muted" style="margin-top:6px;">Total buildings indexed: <b>10</b></div>
+
+          <div id="legend_header" style="margin-top:10px;">
+            <span class="tw-muted">Click a <b>building</b> to load its paths.</span>
+          </div>
+
+          <div class="tw-hr"></div>
+
+          <div id="legend_body">
+            <!-- paths list goes here -->
+          </div>
+
+          <div class="tw-hr"></div>
+
+          <div>
+            <div class="tw-h2">Legend</div>
+            <div style="display:flex; flex-wrap:wrap; margin-top:8px;">
+              <span class="tw-legend-chip"><span class="tw-pathline" style="background:#E31837;"></span> Shortest</span>
+              <span class="tw-legend-chip"><span class="tw-pathline" style="background:#002B5C;"></span> Few lights</span>
+              <span class="tw-legend-chip"><span class="tw-pathline" style="background:#4CAF50;"></span> Safest</span>
+              <span class="tw-legend-chip"><span class="tw-pathline" style="background:#FFD700;"></span> Fastest</span>
+            </div>
+          </div>
+
+          <div class="tw-small tw-muted" style="margin-top:10px;">
+            Tip: Use checkboxes to show/hide multiple paths at once; or “Show All”.
+          </div>
+        </div>
+        
+    
+        <script>
+// Color + dash patterns for clarity
+const PATH_STYLES = {
+  'shortest path (day profile)': { color: '#E31837', dashArray: '0', weight: 5 },
+  'few traffic lights (day profile)': { color: '#002B5C', dashArray: '6 6', weight: 5 },
+  'safest path (day profile)': { color: '#4CAF50', dashArray: '10 6', weight: 5 },
+  'fastest path (day profile)': { color: '#FFD700', dashArray: '2 8', weight: 6 }
+};
+
+let currentPathLayer = null;                      // last "single-show" layer (for Show on Map)
+let currentBuildingLayers = {};                 // per-building: array of polylines
+let lastLoadedBuildingId = null;                  // remember which building is in the panel
+
+function getLeafletMap() {
+  return window['map_4ee6691b1c8d759910c4f43473efc59a'];
+}
+
+function getDataAttr(layer, attr) {
+  const tt = layer.getTooltip && layer.getTooltip();
+  if (!tt) return null;
+  const html = tt.getContent && tt.getContent();
+  if (!html || typeof html !== 'string') return null;
+  const re = new RegExp(attr + '="([^"]+)"');
+  const m = html.match(re);
+  return m ? m[1] : null;
+}
+
+function wireMarkerClicks() {
+  const map = getLeafletMap();
+  if (!map) return;
+  map.eachLayer(function(layer) {
+    if (layer && typeof layer.on === 'function' && layer.getTooltip && layer.getTooltip()) {
+      const bid = getDataAttr(layer, 'data-bid');
+      const bname = getDataAttr(layer, 'data-bname') || bid;
+      if (!bid) return;
+      if (layer.__wiredPathsClick) return;
+      layer.__wiredPathsClick = true;
+
+      layer.on('click', function() {
+        loadBuildingPathsLegend(bid, bname);
+      });
+    }
+  });
+}
+
+function clearSelectedPath() {
+  const map = getLeafletMap();
+  if (currentPathLayer && map) {
+    map.removeLayer(currentPathLayer);
+    currentPathLayer = null;
+  }
+}
+
+// Remove all existing per-building layers from map (for previous building)
+function clearCurrentBuildingLayers() {
+  const map = getLeafletMap();
+  if (!map) return;
+  if (!lastLoadedBuildingId) return;
+  const arr = currentBuildingLayers[lastLoadedBuildingId] || [];
+  arr.forEach(pl => map.removeLayer(pl));
+  currentBuildingLayers[lastLoadedBuildingId] = [];
+}
+
+async function loadBuildingPathsLegend(buildingId, buildingName) {
+  const header = document.getElementById('legend_header');
+  const body = document.getElementById('legend_body');
+
+  // Clear previous building layers
+  clearCurrentBuildingLayers();
+
+  lastLoadedBuildingId = buildingId;
+  header.innerHTML = `
+    <div class="tw-row" style="align-items:flex-start;">
+      <div style="min-width:0;">
+        <div class="tw-h2" style="font-size:16px;">${buildingName || buildingId}</div>
+      </div>
+      <div style="display:flex; gap:8px; flex-wrap:wrap;">
+        <button class="tw-btn tw-btn-ghost" onclick="toggleAllPaths(true)">Show All</button>
+        <button class="tw-btn tw-btn-ghost" onclick="toggleAllPaths(false)">Hide All</button>
+        <button class="tw-btn tw-btn-primary" onclick="fitAllVisible()">Fit</button>
+      </div>
+    </div>
+  `;
+
+  body.innerHTML = '<p class="tw-muted">Loading paths…</p>';
+
+  try {
+    const url = `results/to_135310103/building_${buildingId}_to_135310103_results.json`;
+    const resp = await fetch(url);
+    if (!resp.ok) throw new Error('Failed to load building data');
+    const data = await resp.json();
+
+    const info = data[buildingId];
+    const paths = (info && info.paths) ? info.paths : [];
+
+    if (!paths.length) {
+      body.innerHTML = '<p style="color:#aa0000;">No paths found for this building.</p>';
+      return;
+    }
+
+    // Build UI + prepare layer objects (but do not add to map yet)
+    const map = getLeafletMap();
+    currentBuildingLayers[buildingId] = [];
+    let html = '';
+
+    paths.forEach((p, idx) => {
+      const style = PATH_STYLES[p.algorithm] || { color:'#666', dashArray:'0', weight: 5 };
+      const dist = Math.round(p.distance_meters || 0);
+      const mins = ((p.time_seconds || 0) / 60).toFixed(2); // two decimals
+      const coords = (p.path_coordinates || []).map(c => [c.lat, c.lon]);
+
+      // Create polyline layer but don't add yet
+      const pl = L.polyline(coords, {
+        color: style.color,
+        weight: style.weight,
+        opacity: 0.95,
+        dashArray: style.dashArray
+      });
+      pl.__visible = false;
+      currentBuildingLayers[buildingId].push(pl);
+
+      html += `
+        <div class="tw-pathcard" style="--clr: ${style.color}">
+          <div class="tw-row">
+            <div style="min-width:0;">
+              <div class="tw-h2" style="color:${style.color};">${(p.algorithm || 'PATH').toUpperCase()}</div>
+              <div class="tw-metric">Distance: <b>${dist}</b> m &nbsp;·&nbsp; Time: <b>${mins}</b> min</div>
+            </div>
+            <div style="display:flex; align-items:center; gap:8px;">
+              <label class="tw-small tw-muted" title="Toggle visibility">
+                <input class="tw-checkbox" type="checkbox" data-path-index="${idx}" onchange="togglePath('${buildingId}', ${idx}, this.checked)"> show
+              </label>
+              <button class="tw-btn tw-btn-ghost" onclick="showOnlyPath('${buildingId}', ${idx})">Only</button>
+            </div>
+          </div>
+        </div>
+      `;
+    });
+
+    body.innerHTML = html;
+  } catch (e) {
+    body.innerHTML = '<p style="color:red;">Error: ' + e.message + '</p>';
+  }
+}
+
+// Toggle a single path’s visibility
+function togglePath(buildingId, index, visible) {
+  const map = getLeafletMap();
+  const layers = (currentBuildingLayers[buildingId] || []);
+  const pl = layers[index];
+  if (!pl || !map) return;
+
+  if (visible) {
+    if (!pl.__visible) {
+      pl.addTo(map);
+      pl.__visible = true;
+    }
+  } else {
+    if (pl.__visible) {
+      map.removeLayer(pl);
+      pl.__visible = false;
+    }
+  }
+}
+
+// Show only one path (removes others), and fit to it
+function showOnlyPath(buildingId, index) {
+  const map = getLeafletMap();
+  if (!map) return;
+
+  // Hide all checkboxes first
+  const body = document.getElementById('legend_body');
+  body.querySelectorAll('input[type="checkbox"][data-path-index]').forEach(cb => cb.checked = false);
+
+  // Hide all lines
+  (currentBuildingLayers[buildingId] || []).forEach(pl => {
+    if (pl.__visible) map.removeLayer(pl);
+    pl.__visible = false;
+  });
+
+  // Show selected
+  const layers = (currentBuildingLayers[buildingId] || []);
+  const pl = layers[index];
+  if (!pl) return;
+  pl.addTo(map);
+  pl.__visible = true;
+
+  // Check its checkbox
+  const cb = body.querySelector('input[type="checkbox"][data-path-index="' + index + '"]');
+  if (cb) cb.checked = true;
+
+  fitAllVisible();
+}
+
+// Show/Hide all paths for current building
+function toggleAllPaths(visible) {
+  const map = getLeafletMap();
+  if (!map || !lastLoadedBuildingId) return;
+  const layers = (currentBuildingLayers[lastLoadedBuildingId] || []);
+  const body = document.getElementById('legend_body');
+
+  layers.forEach((pl, i) => {
+    const cb = body.querySelector('input[type="checkbox"][data-path-index="' + i + '"]');
+    if (cb) cb.checked = visible;
+    if (visible) {
+      if (!pl.__visible) {
+        pl.addTo(map); pl.__visible = true;
+      }
+    } else {
+      if (pl.__visible) {
+        map.removeLayer(pl); pl.__visible = false;
+      }
+    }
+  });
+
+  if (visible) fitAllVisible();
+}
+
+// Fit map to all currently visible paths (for the loaded building)
+function fitAllVisible() {
+  const map = getLeafletMap();
+  if (!map || !lastLoadedBuildingId) return;
+  const layers = (currentBuildingLayers[lastLoadedBuildingId] || []);
+  const visible = layers.filter(pl => pl.__visible);
+  if (!visible.length) return;
+  const group = L.featureGroup(visible);
+  map.fitBounds(group.getBounds(), { padding: [30, 30] });
+}
+
+// Legacy single "Show on Map" (kept for API completeness; unused in new UI)
+function showPathOnMap(buildingId, pathIndex) {
+  const map = getLeafletMap();
+  if (!map) return;
+  if (currentPathLayer) {
+    map.removeLayer(currentPathLayer);
+    currentPathLayer = null;
+  }
+  fetch(`results/to_135310103/building_${buildingId}_to_135310103_results.json`)
+    .then(r => r.json())
+    .then(data => {
+      const info = data[buildingId];
+      const p = (info && info.paths) ? info.paths[pathIndex] : null;
+      if (!p || !p.path_coordinates) return;
+
+      const style = PATH_STYLES[p.algorithm] || { color:'#666', dashArray:'0', weight:5 };
+      const coords = p.path_coordinates.map(c => [c.lat, c.lon]);
+      currentPathLayer = L.polyline(coords, { color: style.color, weight: style.weight, opacity: 0.95, dashArray: style.dashArray });
+      currentPathLayer.addTo(map);
+      map.fitBounds(currentPathLayer.getBounds());
+    })
+    .catch(e => alert('Error loading path: ' + e.message));
+}
+
+// Initialize after Folium map is ready
+(function init() {
+  const tryWire = () => {
+    const map = getLeafletMap();
+    if (!map) { setTimeout(tryWire, 150); return; }
+    wireMarkerClicks();
+  };
+  tryWire();
+})();
+        </script>
+        
+    
+            <div class="folium-map" id="map_4ee6691b1c8d759910c4f43473efc59a" ></div>
+        
+</body>
+<script>
+    
+    
+            var map_4ee6691b1c8d759910c4f43473efc59a = L.map(
+                "map_4ee6691b1c8d759910c4f43473efc59a",
+                {
+                    center: [31.25522, 34.79282],
+                    crs: L.CRS.EPSG3857,
+                    zoom: 16,
+                    zoomControl: true,
+                    preferCanvas: false,
+                }
+            );
+
+            
+
+        
+    
+            var tile_layer_f3063f04b51a6c5aa44bd82ec81635de = L.tileLayer(
+                "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",
+                {"attribution": "Data by \u0026copy; \u003ca target=\"_blank\" href=\"http://openstreetmap.org\"\u003eOpenStreetMap\u003c/a\u003e, under \u003ca target=\"_blank\" href=\"http://www.openstreetmap.org/copyright\"\u003eODbL\u003c/a\u003e.", "detectRetina": false, "maxNativeZoom": 18, "maxZoom": 18, "minZoom": 0, "noWrap": false, "opacity": 1, "subdomains": "abc", "tms": false}
+            ).addTo(map_4ee6691b1c8d759910c4f43473efc59a);
+        
+    
+            var marker_924c0e45d7a5ab229845ca0e506a16ad = L.marker(
+                [31.2536563, 34.7958321],
+                {}
+            ).addTo(map_4ee6691b1c8d759910c4f43473efc59a);
+        
+    
+            var icon_0c34d353f1ac6e67015062d843a33822 = L.AwesomeMarkers.icon(
+                {"extraClasses": "fa-rotate-0", "icon": "home", "iconColor": "white", "markerColor": "blue", "prefix": "fa"}
+            );
+            marker_924c0e45d7a5ab229845ca0e506a16ad.setIcon(icon_0c34d353f1ac6e67015062d843a33822);
+        
+    
+            marker_924c0e45d7a5ab229845ca0e506a16ad.bindTooltip(
+                `<div>
+                     <span data-bid="319162884" data-bname="Building 319162884">Building 319162884</span>
+                 </div>`,
+                {"sticky": true}
+            );
+        
+    
+            var marker_09844b77198aa948c0829588687911dd = L.marker(
+                [31.2532763, 34.7925278],
+                {}
+            ).addTo(map_4ee6691b1c8d759910c4f43473efc59a);
+        
+    
+            var icon_2cb23635e77a926ee279d15cf1a0798a = L.AwesomeMarkers.icon(
+                {"extraClasses": "fa-rotate-0", "icon": "home", "iconColor": "white", "markerColor": "blue", "prefix": "fa"}
+            );
+            marker_09844b77198aa948c0829588687911dd.setIcon(icon_2cb23635e77a926ee279d15cf1a0798a);
+        
+    
+            marker_09844b77198aa948c0829588687911dd.bindTooltip(
+                `<div>
+                     <span data-bid="319162891" data-bname="Building 319162891">Building 319162891</span>
+                 </div>`,
+                {"sticky": true}
+            );
+        
+    
+            var marker_4922f8fbfe3c5a8ffd5d5b3ca91a9a0a = L.marker(
+                [31.2528926, 34.7964448],
+                {}
+            ).addTo(map_4ee6691b1c8d759910c4f43473efc59a);
+        
+    
+            var icon_86143f5e2da955df99e0ce49f519c038 = L.AwesomeMarkers.icon(
+                {"extraClasses": "fa-rotate-0", "icon": "home", "iconColor": "white", "markerColor": "blue", "prefix": "fa"}
+            );
+            marker_4922f8fbfe3c5a8ffd5d5b3ca91a9a0a.setIcon(icon_86143f5e2da955df99e0ce49f519c038);
+        
+    
+            marker_4922f8fbfe3c5a8ffd5d5b3ca91a9a0a.bindTooltip(
+                `<div>
+                     <span data-bid="319162900" data-bname="Building 319162900">Building 319162900</span>
+                 </div>`,
+                {"sticky": true}
+            );
+        
+    
+            var marker_2675a8950e1607ec7ea16a413ae25615 = L.marker(
+                [31.2541446, 34.7958258],
+                {}
+            ).addTo(map_4ee6691b1c8d759910c4f43473efc59a);
+        
+    
+            var icon_1f3b7a6efa10b0f6c13a974a51f2371b = L.AwesomeMarkers.icon(
+                {"extraClasses": "fa-rotate-0", "icon": "home", "iconColor": "white", "markerColor": "blue", "prefix": "fa"}
+            );
+            marker_2675a8950e1607ec7ea16a413ae25615.setIcon(icon_1f3b7a6efa10b0f6c13a974a51f2371b);
+        
+    
+            marker_2675a8950e1607ec7ea16a413ae25615.bindTooltip(
+                `<div>
+                     <span data-bid="319162914" data-bname="Building 319162914">Building 319162914</span>
+                 </div>`,
+                {"sticky": true}
+            );
+        
+    
+            var marker_689070a2bc04005c1f479b5e325b7f31 = L.marker(
+                [31.2535538, 34.7951475],
+                {}
+            ).addTo(map_4ee6691b1c8d759910c4f43473efc59a);
+        
+    
+            var icon_3fd284b12b52b1926ab2fedfe261f4fa = L.AwesomeMarkers.icon(
+                {"extraClasses": "fa-rotate-0", "icon": "home", "iconColor": "white", "markerColor": "blue", "prefix": "fa"}
+            );
+            marker_689070a2bc04005c1f479b5e325b7f31.setIcon(icon_3fd284b12b52b1926ab2fedfe261f4fa);
+        
+    
+            marker_689070a2bc04005c1f479b5e325b7f31.bindTooltip(
+                `<div>
+                     <span data-bid="319162923" data-bname="Building 319162923">Building 319162923</span>
+                 </div>`,
+                {"sticky": true}
+            );
+        
+    
+            var marker_f15859875e8a2ff824d59f225b6ca933 = L.marker(
+                [31.2533972, 34.7964894],
+                {}
+            ).addTo(map_4ee6691b1c8d759910c4f43473efc59a);
+        
+    
+            var icon_79cd2dd725ab01461047b884a88d23e2 = L.AwesomeMarkers.icon(
+                {"extraClasses": "fa-rotate-0", "icon": "home", "iconColor": "white", "markerColor": "blue", "prefix": "fa"}
+            );
+            marker_f15859875e8a2ff824d59f225b6ca933.setIcon(icon_79cd2dd725ab01461047b884a88d23e2);
+        
+    
+            marker_f15859875e8a2ff824d59f225b6ca933.bindTooltip(
+                `<div>
+                     <span data-bid="319162929" data-bname="Building 319162929">Building 319162929</span>
+                 </div>`,
+                {"sticky": true}
+            );
+        
+    
+            var marker_c159b983ec6cea321aae875ad2c5a5e5 = L.marker(
+                [31.2551306, 34.7906195],
+                {}
+            ).addTo(map_4ee6691b1c8d759910c4f43473efc59a);
+        
+    
+            var icon_71881c484322f120175cfb6984f5870d = L.AwesomeMarkers.icon(
+                {"extraClasses": "fa-rotate-0", "icon": "home", "iconColor": "white", "markerColor": "blue", "prefix": "fa"}
+            );
+            marker_c159b983ec6cea321aae875ad2c5a5e5.setIcon(icon_71881c484322f120175cfb6984f5870d);
+        
+    
+            marker_c159b983ec6cea321aae875ad2c5a5e5.bindTooltip(
+                `<div>
+                     <span data-bid="319162932" data-bname="Building 319162932">Building 319162932</span>
+                 </div>`,
+                {"sticky": true}
+            );
+        
+    
+            var marker_e9ea4cf2b7d3e96e8d17e3e81ae52c30 = L.marker(
+                [31.2538991, 34.7964911],
+                {}
+            ).addTo(map_4ee6691b1c8d759910c4f43473efc59a);
+        
+    
+            var icon_a912ee7a839a153446bca6e77915dd52 = L.AwesomeMarkers.icon(
+                {"extraClasses": "fa-rotate-0", "icon": "home", "iconColor": "white", "markerColor": "blue", "prefix": "fa"}
+            );
+            marker_e9ea4cf2b7d3e96e8d17e3e81ae52c30.setIcon(icon_a912ee7a839a153446bca6e77915dd52);
+        
+    
+            marker_e9ea4cf2b7d3e96e8d17e3e81ae52c30.bindTooltip(
+                `<div>
+                     <span data-bid="319162934" data-bname="Building 319162934">Building 319162934</span>
+                 </div>`,
+                {"sticky": true}
+            );
+        
+    
+            var marker_96d4a9d4cfd654a467284e2b65f6d8e6 = L.marker(
+                [31.2539984, 34.7919596],
+                {}
+            ).addTo(map_4ee6691b1c8d759910c4f43473efc59a);
+        
+    
+            var icon_33e4f007ce05f5d25f8ed80c0d9b2f5e = L.AwesomeMarkers.icon(
+                {"extraClasses": "fa-rotate-0", "icon": "home", "iconColor": "white", "markerColor": "blue", "prefix": "fa"}
+            );
+            marker_96d4a9d4cfd654a467284e2b65f6d8e6.setIcon(icon_33e4f007ce05f5d25f8ed80c0d9b2f5e);
+        
+    
+            marker_96d4a9d4cfd654a467284e2b65f6d8e6.bindTooltip(
+                `<div>
+                     <span data-bid="319162936" data-bname="Building 319162936">Building 319162936</span>
+                 </div>`,
+                {"sticky": true}
+            );
+        
+    
+            var marker_5b14f0ceece5b82ac77642cf6afbe79a = L.marker(
+                [31.2531544, 34.7958416],
+                {}
+            ).addTo(map_4ee6691b1c8d759910c4f43473efc59a);
+        
+    
+            var icon_64bc8cbe090f4eb058c55d3a0f1098a1 = L.AwesomeMarkers.icon(
+                {"extraClasses": "fa-rotate-0", "icon": "home", "iconColor": "white", "markerColor": "blue", "prefix": "fa"}
+            );
+            marker_5b14f0ceece5b82ac77642cf6afbe79a.setIcon(icon_64bc8cbe090f4eb058c55d3a0f1098a1);
+        
+    
+            marker_5b14f0ceece5b82ac77642cf6afbe79a.bindTooltip(
+                `<div>
+                     <span data-bid="319162939" data-bname="Building 319162939">Building 319162939</span>
+                 </div>`,
+                {"sticky": true}
+            );
+        
+</script>
+</html>
