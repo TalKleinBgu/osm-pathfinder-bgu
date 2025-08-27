@@ -309,6 +309,9 @@ class OSMPathfinder:
         if (way_lit == 'no') or (way_lit is None and self.nodes[e['to_node']].tags.get('lit') == 'no'):
             c += 150.0 if is_night else 25.0
 
+        if way_lit == 'yes' or (way_lit is None and self.nodes[e['to_node']].tags.get('lit') == 'yes'):
+            c -= 10.0
+
         # alley/service and road classification when mixing with traffic
         hw = wt.get('highway')
         if hw in {'alley','service'}:
@@ -367,15 +370,15 @@ class OSMPathfinder:
         amenity = nt.get('amenity','')
         leisure = nt.get('leisure','')
         if (
-            amenity in {'place_of_worship','synagogue','school','kindergarten','university','library','community_centre','police','clinic','hospital'}
-            or leisure in {'playground','pitch','sports_centre','stadium','park','garden'}
+            amenity in {'place_of_worship','synagogue','school','kindergarten','university','library','community_centre','police','clinic','hospital','restaurant','cafe'}
+            or leisure in {'playground','pitch','sports_centre','stadium','park','garden','fitness_centre','dog_park','swimming_pool'}
             or nt.get('near_public_place') == 'yes'
         ):
             bonus = 40.0 if is_night else 20.0
         if bonus:
             c = max(e['distance'], c - bonus)
 
-        return c
+        return max(e['distance'], c)
 
     def _cost_fastest(self, e, from_id):  # seconds
         dist = e['distance']
@@ -443,83 +446,138 @@ class OSMPathfinder:
     # ---------------- Bidirectional A* (Front-to-Front) ----------------
 
     def bidir_astar(self, start: str, goal: str, profile: str, is_night=False) -> Optional[PathResult]:
+        if start == goal:
+            return self._calc_stats([start], profile, is_night)
         if start not in self.graph or goal not in self.graph:
             return None
 
+        # Select edge cost
         def edge_cost(e, u):
-            if profile == 'shortest':   return self._cost_shortest(e,u)
-            if profile == 'few_traffic_lights': return self._cost_few_traffic_lights(e,u)
-            if profile == 'safest':     return self._cost_safest(e,u,is_night)
-            if profile == 'fastest':    return self._cost_fastest(e,u)
-            return self._cost_shortest(e,u)
+            if profile == 'shortest': return self._cost_shortest(e, u)
+            if profile == 'few_traffic_lights': return self._cost_few_traffic_lights(e, u)
+            if profile == 'safest': return self._cost_safest(e, u, is_night)
+            if profile == 'fastest': return self._cost_fastest(e, u)
+            return self._cost_shortest(e, u)
 
-        def h(u, v):
-            return self._heuristic_time(u,v) if profile == 'fastest' else self._heuristic_distance(u,v)
+        # Heuristics: keep admissible for each profile
+        def hF(n):  # forward heuristic to goal
+            if profile == 'fastest':
+                return self._heuristic_time(n, goal)
+            if profile == 'few_traffic_lights':
+                return 0.95 * self._few_traffic_lights_cfg['distance_factor'] * self._heuristic_distance(n, goal)
+            return self._heuristic_distance(n, goal)
+
+        def hB(n):  # backward heuristic to start
+            if profile == 'fastest':
+                return self._heuristic_time(n, start)
+            if profile == 'few_traffic_lights':
+                return 0.95 * self._few_traffic_lights_cfg['distance_factor'] * self._heuristic_distance(n, start)
+            return self._heuristic_distance(n, start)
 
         # State
-        gF, gB = {start: 0.0}, {goal: 0.0}
-        cameF, cameB = {start: None}, {goal: None}
-        openF = [(h(start, goal), start)]
-        openB = [(h(goal, start), goal)]
-        inF, inB = {start}, {goal}
-        UB = float('inf'); meet = None
-        t0 = time.time()
+        gF = {start: 0.0}
+        gB = {goal: 0.0}
+        predF = {start: None}
+        predB = {goal: None}
+        openF = [(hF(start), 0.0, start)]  # (f, g, node)
+        openB = [(hB(goal), 0.0, goal)]
+        closedF = set()
+        closedB = set()
 
-        def best_f(heap): return heap[0][0] if heap else float('inf')
+        UB = float('inf')
+        meet = None  # ('node', m) or ('edge', u, v)
 
-        while openF and openB:
-            # termination
-            if best_f(openF) + best_f(openB) >= UB:
+        def top_key(pq):
+            # return current min f, skipping stale
+            while pq and (pq[0][1] > (gF.get(pq[0][2], float('inf')) if pq is openF else gB.get(pq[0][2], float('inf')))):
+                heapq.heappop(pq)
+            return pq[0][0] if pq else float('inf')
+
+        def improve_UB_via_node(u):
+            nonlocal UB, meet
+            if u in gF and u in gB:
+                val = gF[u] + gB[u]
+                if val < UB:
+                    UB = val
+                    meet = ('node', u)
+
+        def relax_dir(u, g_u, graph_dir, g_here, g_other, pred_here, h_here, open_here, is_forward: bool):
+            nonlocal UB, meet
+            for e in graph_dir.get(u, []):
+                v = e['to_node']
+                c = edge_cost(e, u)
+                if c < 0:
+                    continue  # safety
+                tentative = g_u + c
+                if tentative < g_here.get(v, float('inf')):
+                    g_here[v] = tentative
+                    pred_here[v] = u
+                    f = tentative + h_here(v)
+                    heapq.heappush(open_here, (f, tentative, v))
+                # Try to tighten UB using v if the other search has reached v
+                if v in g_other:
+                    cand = tentative + g_other[v]
+                    if cand < UB:
+                        UB = cand
+                        meet = ('edge', u, v) if is_forward else ('edge', v, u)  # store as (u->v) in forward direction
+
+        # Main loop
+        while openF or openB:
+            # Expand side with smaller current f
+            if top_key(openF) <= top_key(openB):
+                # Forward step
+                f_u, g_u, u = heapq.heappop(openF)
+                if u in closedF or g_u != gF.get(u, float('inf')):
+                    continue
+                closedF.add(u)
+                improve_UB_via_node(u)
+                relax_dir(u, g_u, self.graph, gF, gB, predF, hF, openF, True)
+            else:
+                # Backward step
+                f_u, g_u, u = heapq.heappop(openB)
+                if u in closedB or g_u != gB.get(u, float('inf')):
+                    continue
+                closedB.add(u)
+                improve_UB_via_node(u)
+                relax_dir(u, g_u, self.rgraph, gB, gF, predB, hB, openB, False)
+
+            # Termination: when best possible connection cannot beat current UB
+            if (top_key(openF) + top_key(openB)) >= UB:
                 break
 
-            # choose side: expand the side with smaller current f
-            forward_turn = best_f(openF) <= best_f(openB)
-
-            if forward_turn:
-                _, u = heapq.heappop(openF); inF.discard(u)
-                # expand neighbors in forward graph
-                for e in self.graph[u]:
-                    v = e['to_node']
-                    gv = gF[u] + edge_cost(e, u)
-                    if gv < gF.get(v, float('inf')):
-                        gF[v] = gv; cameF[v] = u
-                        fv = gv + h(v, goal)
-                        if v not in inF:
-                            heapq.heappush(openF, (fv, v)); inF.add(v)
-                        # meet check
-                        if v in gB and gv + gB[v] < UB:
-                            UB = gv + gB[v]; meet = v
-            else:
-                _, u = heapq.heappop(openB); inB.discard(u)
-                # expand neighbors in reverse graph (u <- v in forward)
-                for e in self.rgraph[u]:
-                    v = e['to_node']
-                    gv = gB[u] + edge_cost(e, v)  # cost of forward edge v->u
-                    if gv < gB.get(v, float('inf')):
-                        gB[v] = gv; cameB[v] = u
-                        fv = gv + h(v, start)
-                        if v not in inB:
-                            heapq.heappush(openB, (fv, v)); inB.add(v)
-                        # meet check
-                        if v in gF and gF[v] + gv < UB:
-                            UB = gF[v] + gv; meet = v
-
-        if meet is None or UB == float('inf'):
+        if not meet or not math.isfinite(UB):
             return None
 
-        # reconstruct forward path: start -> meet
-        path_f = [meet]
-        while path_f[-1] != start:
-            path_f.append(cameF[path_f[-1]])
-        path_f.reverse()
+        # Reconstruct forward path
+        def build_forward_path_to(u):
+            seq = [u]
+            while predF[seq[-1]] is not None:
+                seq.append(predF[seq[-1]])
+            seq.reverse()
+            return seq
 
-        # reconstruct backward path: meet -> goal using cameB pointers
-        path_b = [meet]
-        while path_b[-1] != goal:
-            path_b.append(cameB[path_b[-1]])
+        def build_forward_path_from_using_B(v):
+            # Use predB chain: next forward node after x is predB[x]
+            seq = [v]
+            cur = v
+            while cur in predB and predB[cur] is not None:
+                nxt = predB[cur]
+                seq.append(nxt)
+                cur = nxt
+            return seq
 
-        full = path_f + path_b[1:]  # drop duplicated meet
-        return self._calc_stats(full, profile, is_night)
+        if meet[0] == 'node':
+            m = meet[1]
+            path = build_forward_path_to(m)
+            tail = build_forward_path_from_using_B(m)
+            path += tail[1:]  # skip duplicate m
+        else:
+            u, v = meet[1], meet[2]  # forward edge u->v
+            head = build_forward_path_to(u)
+            mid_tail = build_forward_path_from_using_B(v)  # starts with v
+            path = head + mid_tail  # includes u->v
+
+        return self._calc_stats(path, profile, is_night)
 
     # -------------------- Stats & JSON export --------------------
 
@@ -551,14 +609,14 @@ class OSMPathfinder:
             nt = self.nodes[v].tags
             if nt.get('highway') == 'traffic_signals' or nt.get('crossing') == 'traffic_signals':
                 sig += 1
-            if nt.get('highway') == 'crossing' or ('crossing' in nt):
+            elif nt.get('highway') == 'crossing' or ('crossing' in nt):
                 cross += 1
 
         descr = {
-            'shortest': 'shortest path (day profile)',
-            'few_traffic_lights': 'few_traffic_lights path (day profile)',
-            'safest': f"safest path ({'night' if is_night else 'day'} profile)",
-            'fastest': 'fastest path (day profile)',
+            'shortest': 'shortest path',
+            'few_traffic_lights': 'few_traffic_lights path',
+            'safest': f"safest path",
+            'fastest': 'fastest path',
         }[profile]
 
         return PathResult(
@@ -790,9 +848,9 @@ def main_multi():
 
     # List of AOIs (north, south, west, east)
     areas = [
-        (31.25865, 31.25179, 34.78705, 34.79859),   # your current box
-        (31.27371, 31.25850, 34.78765, 34.79808),   # another box
-        (31.27167, 31.26512, 34.79806, 34.80381),   # yet another box
+        # (31.25865, 31.25179, 34.78705, 34.79859),   # neighborhoodB
+        # (31.27371, 31.25850, 34.78765, 34.79808),   # neighborhoodD
+        (31.27167, 31.26512, 34.79806, 34.80381),   # neighborhoodOldV
         # add more boxes as needed...
     ]
 
@@ -806,7 +864,7 @@ def main_multi():
         print(f"Routing to target {tid}")
         pf.set_target(tid)
         # Optional: separate folder per target to keep outputs organized
-        out_dir = os.path.join("results", f"to_{tid}")
+        out_dir = os.path.join("results/neighborhoodOldV")
         pf.process_buildings_in_areas(areas, output_folder=out_dir)
 
 if __name__ == "__main__":
