@@ -19,8 +19,14 @@
         "distance_meters": 1520.4057164358157,
         "num_traffic_signals": 3,
         "num_crossings": 0,
-        "safety_penalties": 2050.0,
+        "safety_penalties": 7060.0,
         "time_seconds": 1219.7142977480612,
+        "nodes_expanded_forward": 116,
+        "nodes_expanded_backward": 164,
+        "edges_scanned_forward": 312,
+        "edges_scanned_backward": 432,
+        "stale_pops_forward": 0,
+        "stale_pops_backward": 0,
         "path_coordinates": [
           {
             "lat": 31.2680266,
@@ -340,8 +346,14 @@
         "distance_meters": 1500.9314506372787,
         "num_traffic_signals": 2,
         "num_crossings": 0,
-        "safety_penalties": 1575.0,
+        "safety_penalties": 5630.0,
         "time_seconds": 1164.1573829150038,
+        "nodes_expanded_forward": 1095,
+        "nodes_expanded_backward": 696,
+        "edges_scanned_forward": 2678,
+        "edges_scanned_backward": 1747,
+        "stale_pops_forward": 0,
+        "stale_pops_backward": 0,
         "path_coordinates": [
           {
             "lat": 31.2680266,
@@ -667,12 +679,18 @@
       },
       {
         "algorithm": "safest path",
-        "total_cost": 2467.152599331195,
-        "distance_meters": 1522.1525993311955,
+        "total_cost": 4806.707816659255,
+        "distance_meters": 1826.7078166592576,
         "num_traffic_signals": 2,
         "num_crossings": 0,
-        "safety_penalties": 945.0,
-        "time_seconds": 1151.4317870065768,
+        "safety_penalties": 2980.0,
+        "time_seconds": 1358.4658412164458,
+        "nodes_expanded_forward": 296,
+        "nodes_expanded_backward": 517,
+        "edges_scanned_forward": 808,
+        "edges_scanned_backward": 1295,
+        "stale_pops_forward": 0,
+        "stale_pops_backward": 0,
         "path_coordinates": [
           {
             "lat": 31.2680266,
@@ -745,54 +763,94 @@
             "id": "295332184"
           },
           {
-            "lat": 31.2672771,
-            "lon": 34.7935794,
-            "id": "1925827838"
+            "lat": 31.2674181,
+            "lon": 34.7939799,
+            "id": "1925827842"
           },
           {
-            "lat": 31.2671705,
-            "lon": 34.7938463,
-            "id": "1925827832"
+            "lat": 31.2673341,
+            "lon": 34.7942235,
+            "id": "4214123761"
           },
           {
-            "lat": 31.2670766,
-            "lon": 34.7940811,
-            "id": "4214123698"
+            "lat": 31.26756,
+            "lon": 34.7943484,
+            "id": "4214123729"
           },
           {
-            "lat": 31.2669579,
-            "lon": 34.7943782,
-            "id": "1925827815"
+            "lat": 31.2677966,
+            "lon": 34.7944793,
+            "id": "1925827860"
           },
           {
-            "lat": 31.2668659,
-            "lon": 34.7943321,
-            "id": "1925827790"
+            "lat": 31.2681715,
+            "lon": 34.7946875,
+            "id": "1925827878"
           },
           {
-            "lat": 31.2667793,
-            "lon": 34.794571,
-            "id": "1925827771"
+            "lat": 31.2680715,
+            "lon": 34.7949643,
+            "id": "1925827870"
           },
           {
-            "lat": 31.2664795,
-            "lon": 34.7953984,
-            "id": "1919774737"
+            "lat": 31.268237,
+            "lon": 34.7950654,
+            "id": "1925827884"
           },
           {
-            "lat": 31.2663936,
-            "lon": 34.795707,
-            "id": "1925827737"
+            "lat": 31.2685073,
+            "lon": 34.795213,
+            "id": "2546448334"
           },
           {
-            "lat": 31.266142,
-            "lon": 34.7955838,
-            "id": "1925827719"
+            "lat": 31.2683823,
+            "lon": 34.7955436,
+            "id": "295332176"
           },
           {
-            "lat": 31.2660083,
-            "lon": 34.7959336,
-            "id": "4214074489"
+            "lat": 31.2681597,
+            "lon": 34.7961079,
+            "id": "295332178"
+          },
+          {
+            "lat": 31.2681292,
+            "lon": 34.7960909,
+            "id": "4209693612"
+          },
+          {
+            "lat": 31.2681055,
+            "lon": 34.7961478,
+            "id": "4209693471"
+          },
+          {
+            "lat": 31.2677968,
+            "lon": 34.7968902,
+            "id": "4209693435"
+          },
+          {
+            "lat": 31.2671375,
+            "lon": 34.7965284,
+            "id": "1925827829"
+          },
+          {
+            "lat": 31.2669251,
+            "lon": 34.7964071,
+            "id": "1925827805"
+          },
+          {
+            "lat": 31.2668115,
+            "lon": 34.7966896,
+            "id": "2546448333"
+          },
+          {
+            "lat": 31.2666105,
+            "lon": 34.7965854,
+            "id": "1925827761"
+          },
+          {
+            "lat": 31.2662671,
+            "lon": 34.7964074,
+            "id": "1925827721"
           },
           {
             "lat": 31.2659,
@@ -830,19 +888,9 @@
             "id": "1925931940"
           },
           {
-            "lat": 31.2643877,
-            "lon": 34.7977085,
-            "id": "9439043892"
-          },
-          {
-            "lat": 31.2642247,
-            "lon": 34.797713,
-            "id": "9454832093"
-          },
-          {
-            "lat": 31.264058,
-            "lon": 34.7977175,
-            "id": "1925931741"
+            "lat": 31.2646382,
+            "lon": 34.7980484,
+            "id": "3666511882"
           },
           {
             "lat": 31.2640594,
@@ -1007,8 +1055,14 @@
         "distance_meters": 1507.0538389798073,
         "num_traffic_signals": 2,
         "num_crossings": 0,
-        "safety_penalties": 1120.0,
+        "safety_penalties": 4040.0,
         "time_seconds": 1148.8062703811524,
+        "nodes_expanded_forward": 232,
+        "nodes_expanded_backward": 270,
+        "edges_scanned_forward": 597,
+        "edges_scanned_backward": 711,
+        "stale_pops_forward": 0,
+        "stale_pops_backward": 0,
         "path_coordinates": [
           {
             "lat": 31.2680266,

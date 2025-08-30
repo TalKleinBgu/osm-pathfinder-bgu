@@ -25,7 +25,7 @@
             <meta name="viewport" content="width=device-width,
                 initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
             <style>
-                #map_9bbac5976436722e6b84a5cb33dda288 {
+                #map_d9707c4db0f907381814424872f25027 {
                     position: relative;
                     width: 100.0%;
                     height: 100.0%;
@@ -68,7 +68,7 @@
             </div>
           </div>
 
-          <div class="tw-small tw-muted" style="margin-top:6px;">Total buildings indexed: <b>122</b></div>
+          <div class="tw-small tw-muted" style="margin-top:6px;">Total buildings indexed: <b>121</b></div>
 
           <div id="legend_header" style="margin-top:10px;">
             <span class="tw-muted">Click a <b>building</b> to load its paths.</span>
@@ -111,8 +111,12 @@ let currentPathLayer = null;                      // last "single-show" layer (f
 let currentBuildingLayers = {};                 // per-building: array of polylines
 let lastLoadedBuildingId = null;                  // remember which building is in the panel
 
+// Track all building markers so we can hide/show others when one is selected
+let __allBuildingMarkers = [];
+let __hiddenBuildingMarkers = [];
+
 function getLeafletMap() {
-  return window['map_9bbac5976436722e6b84a5cb33dda288'];
+  return window['map_d9707c4db0f907381814424872f25027'];
 }
 
 function getDataAttr(layer, attr) {
@@ -136,6 +140,14 @@ function wireMarkerClicks() {
       if (layer.__wiredPathsClick) return;
       layer.__wiredPathsClick = true;
 
+      // Register the marker once for hide/show management
+      if (!layer.__registeredBuildingMarker) {
+        layer.__registeredBuildingMarker = true;
+        layer.__bid = bid;
+        layer.__bname = bname;
+        __allBuildingMarkers.push(layer);
+      }
+
       layer.on('click', function() {
         loadBuildingPathsLegend(bid, bname);
       });
@@ -149,6 +161,8 @@ function clearSelectedPath() {
     map.removeLayer(currentPathLayer);
     currentPathLayer = null;
   }
+  // Restore all building markers when clearing
+  showAllBuildingMarkers();
 }
 
 // Remove all existing per-building layers from map (for previous building)
@@ -161,6 +175,32 @@ function clearCurrentBuildingLayers() {
   currentBuildingLayers[lastLoadedBuildingId] = [];
 }
 
+// Hide all other building markers except the selected one
+function hideOtherBuildingMarkers(selectedBid) {
+  const map = getLeafletMap();
+  if (!map) return;
+  __hiddenBuildingMarkers = [];
+  __allBuildingMarkers.forEach(m => {
+    if (!m) return;
+    if (m.__bid !== selectedBid && map.hasLayer(m)) {
+      map.removeLayer(m);
+      __hiddenBuildingMarkers.push(m);
+    }
+  });
+}
+
+// Show back any previously hidden building markers
+function showAllBuildingMarkers() {
+  const map = getLeafletMap();
+  if (!map) return;
+  __hiddenBuildingMarkers.forEach(m => {
+    if (m && !map.hasLayer(m)) {
+      m.addTo(map);
+    }
+  });
+  __hiddenBuildingMarkers = [];
+}
+
 async function loadBuildingPathsLegend(buildingId, buildingName) {
   const header = document.getElementById('legend_header');
   const body = document.getElementById('legend_body');
@@ -169,6 +209,9 @@ async function loadBuildingPathsLegend(buildingId, buildingName) {
   clearCurrentBuildingLayers();
 
   lastLoadedBuildingId = buildingId;
+  // Hide other buildings so only the selected building marker remains visible
+  showAllBuildingMarkers();
+  hideOtherBuildingMarkers(buildingId);
   header.innerHTML = `
     <div class="tw-row" style="align-items:flex-start;">
       <div style="min-width:0;">
@@ -177,7 +220,8 @@ async function loadBuildingPathsLegend(buildingId, buildingName) {
       <div style="display:flex; gap:8px; flex-wrap:wrap;">
         <button class="tw-btn tw-btn-ghost" onclick="toggleAllPaths(true)">Show All</button>
         <button class="tw-btn tw-btn-ghost" onclick="toggleAllPaths(false)">Hide All</button>
-        <button class="tw-btn tw-btn-primary" onclick="fitAllVisible()">Fit</button>
+  <button class="tw-btn tw-btn-primary" onclick="fitAllVisible()">Fit</button>
+  <button class="tw-btn tw-btn-ghost" onclick="showAllBuildingMarkers()" title="Show all building markers again">Show Buildings</button>
       </div>
     </div>
   `;
@@ -238,6 +282,9 @@ async function loadBuildingPathsLegend(buildingId, buildingName) {
     });
 
     body.innerHTML = html;
+    
+    // Automatically show all paths when building is selected
+    toggleAllPaths(true);
   } catch (e) {
     body.innerHTML = '<p style="color:red;">Error: ' + e.message + '</p>';
   }
@@ -363,14 +410,14 @@ function showPathOnMap(buildingId, pathIndex) {
         </script>
         
     
-            <div class="folium-map" id="map_9bbac5976436722e6b84a5cb33dda288" ></div>
+            <div class="folium-map" id="map_d9707c4db0f907381814424872f25027" ></div>
         
 </body>
 <script>
     
     
-            var map_9bbac5976436722e6b84a5cb33dda288 = L.map(
-                "map_9bbac5976436722e6b84a5cb33dda288",
+            var map_d9707c4db0f907381814424872f25027 = L.map(
+                "map_d9707c4db0f907381814424872f25027",
                 {
                     center: [31.26171, 34.80048],
                     crs: L.CRS.EPSG3857,
@@ -384,25 +431,25 @@ function showPathOnMap(buildingId, pathIndex) {
 
         
     
-            var tile_layer_4703ad84c784265f9f077361dfe86718 = L.tileLayer(
+            var tile_layer_abb7cb5ec9054e403056dfc79cafa4b7 = L.tileLayer(
                 "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",
                 {"attribution": "Data by \u0026copy; \u003ca target=\"_blank\" href=\"http://openstreetmap.org\"\u003eOpenStreetMap\u003c/a\u003e, under \u003ca target=\"_blank\" href=\"http://www.openstreetmap.org/copyright\"\u003eODbL\u003c/a\u003e.", "detectRetina": false, "maxNativeZoom": 18, "maxZoom": 18, "minZoom": 0, "noWrap": false, "opacity": 1, "subdomains": "abc", "tms": false}
-            ).addTo(map_9bbac5976436722e6b84a5cb33dda288);
+            ).addTo(map_d9707c4db0f907381814424872f25027);
         
     
-            var marker_5acf319450e3324e0fe089241581445c = L.marker(
+            var marker_2353424620d18a6819c4e26b5f10e18d = L.marker(
                 [31.2713499, 34.7983072],
                 {}
-            ).addTo(map_9bbac5976436722e6b84a5cb33dda288);
+            ).addTo(map_d9707c4db0f907381814424872f25027);
         
     
-            var icon_8b40664e34aa53d862a499326800a5c4 = L.AwesomeMarkers.icon(
+            var icon_8a34b38dcbace91ea3cd2faae12cd1e3 = L.AwesomeMarkers.icon(
                 {"extraClasses": "fa-rotate-0", "icon": "home", "iconColor": "white", "markerColor": "blue", "prefix": "fa"}
             );
-            marker_5acf319450e3324e0fe089241581445c.setIcon(icon_8b40664e34aa53d862a499326800a5c4);
+            marker_2353424620d18a6819c4e26b5f10e18d.setIcon(icon_8a34b38dcbace91ea3cd2faae12cd1e3);
         
     
-            marker_5acf319450e3324e0fe089241581445c.bindTooltip(
+            marker_2353424620d18a6819c4e26b5f10e18d.bindTooltip(
                 `<div>
                      <span data-bid="361968022" data-bname="Building 361968022">Building 361968022</span>
                  </div>`,
@@ -410,19 +457,19 @@ function showPathOnMap(buildingId, pathIndex) {
             );
         
     
-            var marker_09f3eaee20b431541fffccc6aebf5080 = L.marker(
+            var marker_e63077565a210f2962aec9bd840409d9 = L.marker(
                 [31.2709581, 34.7985487],
                 {}
-            ).addTo(map_9bbac5976436722e6b84a5cb33dda288);
+            ).addTo(map_d9707c4db0f907381814424872f25027);
         
     
-            var icon_f1396b73d6a2a8c66c1ee085ec18d7c1 = L.AwesomeMarkers.icon(
+            var icon_d44740854b8039ea70964acc38396599 = L.AwesomeMarkers.icon(
                 {"extraClasses": "fa-rotate-0", "icon": "home", "iconColor": "white", "markerColor": "blue", "prefix": "fa"}
             );
-            marker_09f3eaee20b431541fffccc6aebf5080.setIcon(icon_f1396b73d6a2a8c66c1ee085ec18d7c1);
+            marker_e63077565a210f2962aec9bd840409d9.setIcon(icon_d44740854b8039ea70964acc38396599);
         
     
-            marker_09f3eaee20b431541fffccc6aebf5080.bindTooltip(
+            marker_e63077565a210f2962aec9bd840409d9.bindTooltip(
                 `<div>
                      <span data-bid="361968023" data-bname="Building 361968023">Building 361968023</span>
                  </div>`,
@@ -430,19 +477,19 @@ function showPathOnMap(buildingId, pathIndex) {
             );
         
     
-            var marker_3a8a8092445413bf69c2aee87777a54f = L.marker(
+            var marker_405b5cbb158c59143be4ffdc669119d0 = L.marker(
                 [31.2713015, 34.7992328],
                 {}
-            ).addTo(map_9bbac5976436722e6b84a5cb33dda288);
+            ).addTo(map_d9707c4db0f907381814424872f25027);
         
     
-            var icon_2d459deefec580dd97734b09e4b0ba42 = L.AwesomeMarkers.icon(
+            var icon_cf82936bd07e6b8992765bdeb084639b = L.AwesomeMarkers.icon(
                 {"extraClasses": "fa-rotate-0", "icon": "home", "iconColor": "white", "markerColor": "blue", "prefix": "fa"}
             );
-            marker_3a8a8092445413bf69c2aee87777a54f.setIcon(icon_2d459deefec580dd97734b09e4b0ba42);
+            marker_405b5cbb158c59143be4ffdc669119d0.setIcon(icon_cf82936bd07e6b8992765bdeb084639b);
         
     
-            marker_3a8a8092445413bf69c2aee87777a54f.bindTooltip(
+            marker_405b5cbb158c59143be4ffdc669119d0.bindTooltip(
                 `<div>
                      <span data-bid="361968024" data-bname="Building 361968024">Building 361968024</span>
                  </div>`,
@@ -450,19 +497,19 @@ function showPathOnMap(buildingId, pathIndex) {
             );
         
     
-            var marker_693d06310d165df630239cdda4c2f994 = L.marker(
+            var marker_710618fc63876f414f4ee1032ddb4c09 = L.marker(
                 [31.2712284, 34.7995758],
                 {}
-            ).addTo(map_9bbac5976436722e6b84a5cb33dda288);
+            ).addTo(map_d9707c4db0f907381814424872f25027);
         
     
-            var icon_243fc75fa70bffd204ff55f78476eddb = L.AwesomeMarkers.icon(
+            var icon_740f4ed9c4c3415e36a661fff3056f0d = L.AwesomeMarkers.icon(
                 {"extraClasses": "fa-rotate-0", "icon": "home", "iconColor": "white", "markerColor": "blue", "prefix": "fa"}
             );
-            marker_693d06310d165df630239cdda4c2f994.setIcon(icon_243fc75fa70bffd204ff55f78476eddb);
+            marker_710618fc63876f414f4ee1032ddb4c09.setIcon(icon_740f4ed9c4c3415e36a661fff3056f0d);
         
     
-            marker_693d06310d165df630239cdda4c2f994.bindTooltip(
+            marker_710618fc63876f414f4ee1032ddb4c09.bindTooltip(
                 `<div>
                      <span data-bid="361968025" data-bname="Building 361968025">Building 361968025</span>
                  </div>`,
@@ -470,19 +517,19 @@ function showPathOnMap(buildingId, pathIndex) {
             );
         
     
-            var marker_91cbc2f990a31cc8dc9f02c57d2aacbc = L.marker(
+            var marker_91f7d03a5c78789fbb33de19a09e211b = L.marker(
                 [31.2708517, 34.7999359],
                 {}
-            ).addTo(map_9bbac5976436722e6b84a5cb33dda288);
+            ).addTo(map_d9707c4db0f907381814424872f25027);
         
     
-            var icon_6caffc79aaab38dbf346266ca6ff1012 = L.AwesomeMarkers.icon(
+            var icon_3cb87df2ddf2e714962c9a9a8e063652 = L.AwesomeMarkers.icon(
                 {"extraClasses": "fa-rotate-0", "icon": "home", "iconColor": "white", "markerColor": "blue", "prefix": "fa"}
             );
-            marker_91cbc2f990a31cc8dc9f02c57d2aacbc.setIcon(icon_6caffc79aaab38dbf346266ca6ff1012);
+            marker_91f7d03a5c78789fbb33de19a09e211b.setIcon(icon_3cb87df2ddf2e714962c9a9a8e063652);
         
     
-            marker_91cbc2f990a31cc8dc9f02c57d2aacbc.bindTooltip(
+            marker_91f7d03a5c78789fbb33de19a09e211b.bindTooltip(
                 `<div>
                      <span data-bid="361968026" data-bname="Building 361968026">Building 361968026</span>
                  </div>`,
@@ -490,39 +537,19 @@ function showPathOnMap(buildingId, pathIndex) {
             );
         
     
-            var marker_8172635176863af4232300e848124383 = L.marker(
-                [31.271516, 34.7988888],
-                {}
-            ).addTo(map_9bbac5976436722e6b84a5cb33dda288);
-        
-    
-            var icon_d5ecdf88d8a67c143ad9c33730555317 = L.AwesomeMarkers.icon(
-                {"extraClasses": "fa-rotate-0", "icon": "home", "iconColor": "white", "markerColor": "blue", "prefix": "fa"}
-            );
-            marker_8172635176863af4232300e848124383.setIcon(icon_d5ecdf88d8a67c143ad9c33730555317);
-        
-    
-            marker_8172635176863af4232300e848124383.bindTooltip(
-                `<div>
-                     <span data-bid="361968027" data-bname="Building 361968027">Building 361968027</span>
-                 </div>`,
-                {"sticky": true}
-            );
-        
-    
-            var marker_5b4a33d94170f4680c3713a2e3da35aa = L.marker(
+            var marker_8307f809c8601df3582dfe6782cf37fe = L.marker(
                 [31.2712419, 34.7986856],
                 {}
-            ).addTo(map_9bbac5976436722e6b84a5cb33dda288);
+            ).addTo(map_d9707c4db0f907381814424872f25027);
         
     
-            var icon_07bacfdeb666ddc03636ca480c72cda2 = L.AwesomeMarkers.icon(
+            var icon_34decf85e18a8b72b03ebf59da87d998 = L.AwesomeMarkers.icon(
                 {"extraClasses": "fa-rotate-0", "icon": "home", "iconColor": "white", "markerColor": "blue", "prefix": "fa"}
             );
-            marker_5b4a33d94170f4680c3713a2e3da35aa.setIcon(icon_07bacfdeb666ddc03636ca480c72cda2);
+            marker_8307f809c8601df3582dfe6782cf37fe.setIcon(icon_34decf85e18a8b72b03ebf59da87d998);
         
     
-            marker_5b4a33d94170f4680c3713a2e3da35aa.bindTooltip(
+            marker_8307f809c8601df3582dfe6782cf37fe.bindTooltip(
                 `<div>
                      <span data-bid="361968028" data-bname="Building 361968028">Building 361968028</span>
                  </div>`,
@@ -530,19 +557,19 @@ function showPathOnMap(buildingId, pathIndex) {
             );
         
     
-            var marker_e606b8aa34b097b7b6806fd50989cd95 = L.marker(
+            var marker_5b150d0cf6f81f03146cbd750175e3e2 = L.marker(
                 [31.2710998, 34.7989592],
                 {}
-            ).addTo(map_9bbac5976436722e6b84a5cb33dda288);
+            ).addTo(map_d9707c4db0f907381814424872f25027);
         
     
-            var icon_056b5953b23aa38541a368dd4bb20998 = L.AwesomeMarkers.icon(
+            var icon_2ff8b7857b55f0bfc5bbaab8aa0f2638 = L.AwesomeMarkers.icon(
                 {"extraClasses": "fa-rotate-0", "icon": "home", "iconColor": "white", "markerColor": "blue", "prefix": "fa"}
             );
-            marker_e606b8aa34b097b7b6806fd50989cd95.setIcon(icon_056b5953b23aa38541a368dd4bb20998);
+            marker_5b150d0cf6f81f03146cbd750175e3e2.setIcon(icon_2ff8b7857b55f0bfc5bbaab8aa0f2638);
         
     
-            marker_e606b8aa34b097b7b6806fd50989cd95.bindTooltip(
+            marker_5b150d0cf6f81f03146cbd750175e3e2.bindTooltip(
                 `<div>
                      <span data-bid="361968029" data-bname="Building 361968029">Building 361968029</span>
                  </div>`,
@@ -550,19 +577,19 @@ function showPathOnMap(buildingId, pathIndex) {
             );
         
     
-            var marker_7ee177e3f7fce8a90348445586ebec13 = L.marker(
+            var marker_66307abc4f03e395e4324aca8c48b3e7 = L.marker(
                 [31.2706694, 34.7987328],
                 {}
-            ).addTo(map_9bbac5976436722e6b84a5cb33dda288);
+            ).addTo(map_d9707c4db0f907381814424872f25027);
         
     
-            var icon_6c1e3dc3d92ee3177aa8e0e56e370836 = L.AwesomeMarkers.icon(
+            var icon_6af54e1251654b9092524b36fa87bc7c = L.AwesomeMarkers.icon(
                 {"extraClasses": "fa-rotate-0", "icon": "home", "iconColor": "white", "markerColor": "blue", "prefix": "fa"}
             );
-            marker_7ee177e3f7fce8a90348445586ebec13.setIcon(icon_6c1e3dc3d92ee3177aa8e0e56e370836);
+            marker_66307abc4f03e395e4324aca8c48b3e7.setIcon(icon_6af54e1251654b9092524b36fa87bc7c);
         
     
-            marker_7ee177e3f7fce8a90348445586ebec13.bindTooltip(
+            marker_66307abc4f03e395e4324aca8c48b3e7.bindTooltip(
                 `<div>
                      <span data-bid="361968696" data-bname="Building 361968696">Building 361968696</span>
                  </div>`,
@@ -570,19 +597,19 @@ function showPathOnMap(buildingId, pathIndex) {
             );
         
     
-            var marker_8537ac381609f9678cc4c8f1585b0a3a = L.marker(
+            var marker_8908f6961f76777f73fd7c99d10c63f4 = L.marker(
                 [31.2702506, 34.7985127],
                 {}
-            ).addTo(map_9bbac5976436722e6b84a5cb33dda288);
+            ).addTo(map_d9707c4db0f907381814424872f25027);
         
     
-            var icon_0c039c998be76ee9ca3a3007ac843b87 = L.AwesomeMarkers.icon(
+            var icon_140e7d16a5dcb7eee7200f93e4b42eb4 = L.AwesomeMarkers.icon(
                 {"extraClasses": "fa-rotate-0", "icon": "home", "iconColor": "white", "markerColor": "blue", "prefix": "fa"}
             );
-            marker_8537ac381609f9678cc4c8f1585b0a3a.setIcon(icon_0c039c998be76ee9ca3a3007ac843b87);
+            marker_8908f6961f76777f73fd7c99d10c63f4.setIcon(icon_140e7d16a5dcb7eee7200f93e4b42eb4);
         
     
-            marker_8537ac381609f9678cc4c8f1585b0a3a.bindTooltip(
+            marker_8908f6961f76777f73fd7c99d10c63f4.bindTooltip(
                 `<div>
                      <span data-bid="361968697" data-bname="Building 361968697">Building 361968697</span>
                  </div>`,
@@ -590,19 +617,19 @@ function showPathOnMap(buildingId, pathIndex) {
             );
         
     
-            var marker_e5e4d8254398cd46b4df01cfbd5e115c = L.marker(
+            var marker_506a62716ec9db04baa6c8077f7bda6a = L.marker(
                 [31.2697111, 34.7984485],
                 {}
-            ).addTo(map_9bbac5976436722e6b84a5cb33dda288);
+            ).addTo(map_d9707c4db0f907381814424872f25027);
         
     
-            var icon_a6b5285517bd701d1b57925a7b70b686 = L.AwesomeMarkers.icon(
+            var icon_bba37d35fffb8d5243ed3b1b88bdd955 = L.AwesomeMarkers.icon(
                 {"extraClasses": "fa-rotate-0", "icon": "home", "iconColor": "white", "markerColor": "blue", "prefix": "fa"}
             );
-            marker_e5e4d8254398cd46b4df01cfbd5e115c.setIcon(icon_a6b5285517bd701d1b57925a7b70b686);
+            marker_506a62716ec9db04baa6c8077f7bda6a.setIcon(icon_bba37d35fffb8d5243ed3b1b88bdd955);
         
     
-            marker_e5e4d8254398cd46b4df01cfbd5e115c.bindTooltip(
+            marker_506a62716ec9db04baa6c8077f7bda6a.bindTooltip(
                 `<div>
                      <span data-bid="361968699" data-bname="Building 361968699">Building 361968699</span>
                  </div>`,
@@ -610,19 +637,19 @@ function showPathOnMap(buildingId, pathIndex) {
             );
         
     
-            var marker_58fefc462311139f9701ab98b66854a1 = L.marker(
+            var marker_e8dd72baddc1faa1c4f06e8f648a5507 = L.marker(
                 [31.2706969, 34.7993855],
                 {}
-            ).addTo(map_9bbac5976436722e6b84a5cb33dda288);
+            ).addTo(map_d9707c4db0f907381814424872f25027);
         
     
-            var icon_c8b5c87cc36ca7ffa5bfd4d790dcc5fd = L.AwesomeMarkers.icon(
+            var icon_60ae2ddcd4b982547efba3fe07d7f605 = L.AwesomeMarkers.icon(
                 {"extraClasses": "fa-rotate-0", "icon": "home", "iconColor": "white", "markerColor": "blue", "prefix": "fa"}
             );
-            marker_58fefc462311139f9701ab98b66854a1.setIcon(icon_c8b5c87cc36ca7ffa5bfd4d790dcc5fd);
+            marker_e8dd72baddc1faa1c4f06e8f648a5507.setIcon(icon_60ae2ddcd4b982547efba3fe07d7f605);
         
     
-            marker_58fefc462311139f9701ab98b66854a1.bindTooltip(
+            marker_e8dd72baddc1faa1c4f06e8f648a5507.bindTooltip(
                 `<div>
                      <span data-bid="361968700" data-bname="Building 361968700">Building 361968700</span>
                  </div>`,
@@ -630,19 +657,19 @@ function showPathOnMap(buildingId, pathIndex) {
             );
         
     
-            var marker_e404dbd9edc6e3eab6ab50876ffeff7d = L.marker(
+            var marker_25a7f12490ec6c0c7a06c889573fa6c0 = L.marker(
                 [31.2704329, 34.7983474],
                 {}
-            ).addTo(map_9bbac5976436722e6b84a5cb33dda288);
+            ).addTo(map_d9707c4db0f907381814424872f25027);
         
     
-            var icon_002ee4826a8208e5043635158b7cc9a3 = L.AwesomeMarkers.icon(
+            var icon_633f3a30176995c6c2cac9e662661c34 = L.AwesomeMarkers.icon(
                 {"extraClasses": "fa-rotate-0", "icon": "home", "iconColor": "white", "markerColor": "blue", "prefix": "fa"}
             );
-            marker_e404dbd9edc6e3eab6ab50876ffeff7d.setIcon(icon_002ee4826a8208e5043635158b7cc9a3);
+            marker_25a7f12490ec6c0c7a06c889573fa6c0.setIcon(icon_633f3a30176995c6c2cac9e662661c34);
         
     
-            marker_e404dbd9edc6e3eab6ab50876ffeff7d.bindTooltip(
+            marker_25a7f12490ec6c0c7a06c889573fa6c0.bindTooltip(
                 `<div>
                      <span data-bid="361968702" data-bname="Building 361968702">Building 361968702</span>
                  </div>`,
@@ -650,19 +677,19 @@ function showPathOnMap(buildingId, pathIndex) {
             );
         
     
-            var marker_f48261e80f8bfdb02659490c2b203ff3 = L.marker(
+            var marker_4d7efcc1f90eadcbac897399c9dfa8fb = L.marker(
                 [31.2696056, 34.7988293],
                 {}
-            ).addTo(map_9bbac5976436722e6b84a5cb33dda288);
+            ).addTo(map_d9707c4db0f907381814424872f25027);
         
     
-            var icon_88a38f93dd9e3f21fa74ea7bf9706787 = L.AwesomeMarkers.icon(
+            var icon_74dc91cea7e836366315e5c10409b5e6 = L.AwesomeMarkers.icon(
                 {"extraClasses": "fa-rotate-0", "icon": "home", "iconColor": "white", "markerColor": "blue", "prefix": "fa"}
             );
-            marker_f48261e80f8bfdb02659490c2b203ff3.setIcon(icon_88a38f93dd9e3f21fa74ea7bf9706787);
+            marker_4d7efcc1f90eadcbac897399c9dfa8fb.setIcon(icon_74dc91cea7e836366315e5c10409b5e6);
         
     
-            marker_f48261e80f8bfdb02659490c2b203ff3.bindTooltip(
+            marker_4d7efcc1f90eadcbac897399c9dfa8fb.bindTooltip(
                 `<div>
                      <span data-bid="361968705" data-bname="Building 361968705">Building 361968705</span>
                  </div>`,
@@ -670,19 +697,19 @@ function showPathOnMap(buildingId, pathIndex) {
             );
         
     
-            var marker_2c114bef78e2310da50abdb27956651a = L.marker(
+            var marker_c8f1f8882178f11ff5c0ff7811f3a87a = L.marker(
                 [31.2702109, 34.8001919],
                 {}
-            ).addTo(map_9bbac5976436722e6b84a5cb33dda288);
+            ).addTo(map_d9707c4db0f907381814424872f25027);
         
     
-            var icon_09738d77f1085f68d072b53b0456ecaa = L.AwesomeMarkers.icon(
+            var icon_a5db6646baa500d6f90c764632e0ed9c = L.AwesomeMarkers.icon(
                 {"extraClasses": "fa-rotate-0", "icon": "home", "iconColor": "white", "markerColor": "blue", "prefix": "fa"}
             );
-            marker_2c114bef78e2310da50abdb27956651a.setIcon(icon_09738d77f1085f68d072b53b0456ecaa);
+            marker_c8f1f8882178f11ff5c0ff7811f3a87a.setIcon(icon_a5db6646baa500d6f90c764632e0ed9c);
         
     
-            marker_2c114bef78e2310da50abdb27956651a.bindTooltip(
+            marker_c8f1f8882178f11ff5c0ff7811f3a87a.bindTooltip(
                 `<div>
                      <span data-bid="361968708" data-bname="Building 361968708">Building 361968708</span>
                  </div>`,
@@ -690,19 +717,19 @@ function showPathOnMap(buildingId, pathIndex) {
             );
         
     
-            var marker_fd54c3b5703f01c28e4c92251fa23c49 = L.marker(
+            var marker_5374cdd8416b8ea7e29b9a7af979d315 = L.marker(
                 [31.2699999, 34.7986882],
                 {}
-            ).addTo(map_9bbac5976436722e6b84a5cb33dda288);
+            ).addTo(map_d9707c4db0f907381814424872f25027);
         
     
-            var icon_571fa8490fce113273f0b02929919a8c = L.AwesomeMarkers.icon(
+            var icon_850c0e386ebb4979cdf9d12a958c87db = L.AwesomeMarkers.icon(
                 {"extraClasses": "fa-rotate-0", "icon": "home", "iconColor": "white", "markerColor": "blue", "prefix": "fa"}
             );
-            marker_fd54c3b5703f01c28e4c92251fa23c49.setIcon(icon_571fa8490fce113273f0b02929919a8c);
+            marker_5374cdd8416b8ea7e29b9a7af979d315.setIcon(icon_850c0e386ebb4979cdf9d12a958c87db);
         
     
-            marker_fd54c3b5703f01c28e4c92251fa23c49.bindTooltip(
+            marker_5374cdd8416b8ea7e29b9a7af979d315.bindTooltip(
                 `<div>
                      <span data-bid="361968709" data-bname="Building 361968709">Building 361968709</span>
                  </div>`,
@@ -710,19 +737,19 @@ function showPathOnMap(buildingId, pathIndex) {
             );
         
     
-            var marker_803897dc0b51a6563024ded0298b6ce1 = L.marker(
+            var marker_d2fcd6b1614a92ffab24409b48118bc7 = L.marker(
                 [31.2697449, 34.7993666],
                 {}
-            ).addTo(map_9bbac5976436722e6b84a5cb33dda288);
+            ).addTo(map_d9707c4db0f907381814424872f25027);
         
     
-            var icon_62a914866056fc95c344b9d051d18810 = L.AwesomeMarkers.icon(
+            var icon_051439e8e1c90b491fcd4e9de28bb139 = L.AwesomeMarkers.icon(
                 {"extraClasses": "fa-rotate-0", "icon": "home", "iconColor": "white", "markerColor": "blue", "prefix": "fa"}
             );
-            marker_803897dc0b51a6563024ded0298b6ce1.setIcon(icon_62a914866056fc95c344b9d051d18810);
+            marker_d2fcd6b1614a92ffab24409b48118bc7.setIcon(icon_051439e8e1c90b491fcd4e9de28bb139);
         
     
-            marker_803897dc0b51a6563024ded0298b6ce1.bindTooltip(
+            marker_d2fcd6b1614a92ffab24409b48118bc7.bindTooltip(
                 `<div>
                      <span data-bid="361968710" data-bname="Building 361968710">Building 361968710</span>
                  </div>`,
@@ -730,19 +757,19 @@ function showPathOnMap(buildingId, pathIndex) {
             );
         
     
-            var marker_1d7860eeefc75515f04d51bd8e6e7565 = L.marker(
+            var marker_51149073bbf379378e8ff21719d4969a = L.marker(
                 [31.2700733, 34.7996608],
                 {}
-            ).addTo(map_9bbac5976436722e6b84a5cb33dda288);
+            ).addTo(map_d9707c4db0f907381814424872f25027);
         
     
-            var icon_a10339002a4fc55339a58d895fd1ce3f = L.AwesomeMarkers.icon(
+            var icon_00cfa538f5731918993c30e1ba2794fe = L.AwesomeMarkers.icon(
                 {"extraClasses": "fa-rotate-0", "icon": "home", "iconColor": "white", "markerColor": "blue", "prefix": "fa"}
             );
-            marker_1d7860eeefc75515f04d51bd8e6e7565.setIcon(icon_a10339002a4fc55339a58d895fd1ce3f);
+            marker_51149073bbf379378e8ff21719d4969a.setIcon(icon_00cfa538f5731918993c30e1ba2794fe);
         
     
-            marker_1d7860eeefc75515f04d51bd8e6e7565.bindTooltip(
+            marker_51149073bbf379378e8ff21719d4969a.bindTooltip(
                 `<div>
                      <span data-bid="361968711" data-bname="Building 361968711">Building 361968711</span>
                  </div>`,
@@ -750,19 +777,19 @@ function showPathOnMap(buildingId, pathIndex) {
             );
         
     
-            var marker_a47661662921814864aed3a2107f46e3 = L.marker(
+            var marker_5320657e98470772a237be5b550ce83d = L.marker(
                 [31.2702598, 34.7988024],
                 {}
-            ).addTo(map_9bbac5976436722e6b84a5cb33dda288);
+            ).addTo(map_d9707c4db0f907381814424872f25027);
         
     
-            var icon_ce955022b91034aa59c38176a60af531 = L.AwesomeMarkers.icon(
+            var icon_d8e3656c9d82c579c803290b56f63383 = L.AwesomeMarkers.icon(
                 {"extraClasses": "fa-rotate-0", "icon": "home", "iconColor": "white", "markerColor": "blue", "prefix": "fa"}
             );
-            marker_a47661662921814864aed3a2107f46e3.setIcon(icon_ce955022b91034aa59c38176a60af531);
+            marker_5320657e98470772a237be5b550ce83d.setIcon(icon_d8e3656c9d82c579c803290b56f63383);
         
     
-            marker_a47661662921814864aed3a2107f46e3.bindTooltip(
+            marker_5320657e98470772a237be5b550ce83d.bindTooltip(
                 `<div>
                      <span data-bid="361968712" data-bname="Building 361968712">Building 361968712</span>
                  </div>`,
@@ -770,19 +797,19 @@ function showPathOnMap(buildingId, pathIndex) {
             );
         
     
-            var marker_9795b9c07510c11b54e5dde280c37a45 = L.marker(
+            var marker_7149b098ed212c9b31c60ba6aff0de14 = L.marker(
                 [31.2704861, 34.7993963],
                 {}
-            ).addTo(map_9bbac5976436722e6b84a5cb33dda288);
+            ).addTo(map_d9707c4db0f907381814424872f25027);
         
     
-            var icon_3c18feb6166bf77a5502b9536b9dd192 = L.AwesomeMarkers.icon(
+            var icon_f388869eb337457902c6af95ce10bd99 = L.AwesomeMarkers.icon(
                 {"extraClasses": "fa-rotate-0", "icon": "home", "iconColor": "white", "markerColor": "blue", "prefix": "fa"}
             );
-            marker_9795b9c07510c11b54e5dde280c37a45.setIcon(icon_3c18feb6166bf77a5502b9536b9dd192);
+            marker_7149b098ed212c9b31c60ba6aff0de14.setIcon(icon_f388869eb337457902c6af95ce10bd99);
         
     
-            marker_9795b9c07510c11b54e5dde280c37a45.bindTooltip(
+            marker_7149b098ed212c9b31c60ba6aff0de14.bindTooltip(
                 `<div>
                      <span data-bid="361968713" data-bname="Building 361968713">Building 361968713</span>
                  </div>`,
@@ -790,19 +817,19 @@ function showPathOnMap(buildingId, pathIndex) {
             );
         
     
-            var marker_b6f14ba4be648c92ded2ad82686a058d = L.marker(
+            var marker_d7b0d4f2e3feb8d8d55a60928c76a486 = L.marker(
                 [31.2699129, 34.7999344],
                 {}
-            ).addTo(map_9bbac5976436722e6b84a5cb33dda288);
+            ).addTo(map_d9707c4db0f907381814424872f25027);
         
     
-            var icon_45b13f771954592ed818900513e57296 = L.AwesomeMarkers.icon(
+            var icon_6f30fc2fddc41f1545345c5fae930ff5 = L.AwesomeMarkers.icon(
                 {"extraClasses": "fa-rotate-0", "icon": "home", "iconColor": "white", "markerColor": "blue", "prefix": "fa"}
             );
-            marker_b6f14ba4be648c92ded2ad82686a058d.setIcon(icon_45b13f771954592ed818900513e57296);
+            marker_d7b0d4f2e3feb8d8d55a60928c76a486.setIcon(icon_6f30fc2fddc41f1545345c5fae930ff5);
         
     
-            marker_b6f14ba4be648c92ded2ad82686a058d.bindTooltip(
+            marker_d7b0d4f2e3feb8d8d55a60928c76a486.bindTooltip(
                 `<div>
                      <span data-bid="361968714" data-bname="Building 361968714">Building 361968714</span>
                  </div>`,
@@ -810,19 +837,19 @@ function showPathOnMap(buildingId, pathIndex) {
             );
         
     
-            var marker_dd4d476596b7795b1fa29b5f9cb2ac4e = L.marker(
+            var marker_980ec7b7f0ebccce289e8bd621da03c6 = L.marker(
                 [31.2705548, 34.7999719],
                 {}
-            ).addTo(map_9bbac5976436722e6b84a5cb33dda288);
+            ).addTo(map_d9707c4db0f907381814424872f25027);
         
     
-            var icon_3b50c5b3a5edaf04e1f8e7b85702f2a1 = L.AwesomeMarkers.icon(
+            var icon_12716e06243e34e6f47ae7537604e81f = L.AwesomeMarkers.icon(
                 {"extraClasses": "fa-rotate-0", "icon": "home", "iconColor": "white", "markerColor": "blue", "prefix": "fa"}
             );
-            marker_dd4d476596b7795b1fa29b5f9cb2ac4e.setIcon(icon_3b50c5b3a5edaf04e1f8e7b85702f2a1);
+            marker_980ec7b7f0ebccce289e8bd621da03c6.setIcon(icon_12716e06243e34e6f47ae7537604e81f);
         
     
-            marker_dd4d476596b7795b1fa29b5f9cb2ac4e.bindTooltip(
+            marker_980ec7b7f0ebccce289e8bd621da03c6.bindTooltip(
                 `<div>
                      <span data-bid="361968717" data-bname="Building 361968717">Building 361968717</span>
                  </div>`,
@@ -830,19 +857,19 @@ function showPathOnMap(buildingId, pathIndex) {
             );
         
     
-            var marker_ff60871b3ee02033e00aab28eb00c669 = L.marker(
+            var marker_5d5fdb235e40aeea1b0b4d4e068a317c = L.marker(
                 [31.2682188, 34.7995832],
                 {}
-            ).addTo(map_9bbac5976436722e6b84a5cb33dda288);
+            ).addTo(map_d9707c4db0f907381814424872f25027);
         
     
-            var icon_e3fc3f802550658bf2bae0d758518caa = L.AwesomeMarkers.icon(
+            var icon_47b29567bc3682d480f481b161884d09 = L.AwesomeMarkers.icon(
                 {"extraClasses": "fa-rotate-0", "icon": "home", "iconColor": "white", "markerColor": "blue", "prefix": "fa"}
             );
-            marker_ff60871b3ee02033e00aab28eb00c669.setIcon(icon_e3fc3f802550658bf2bae0d758518caa);
+            marker_5d5fdb235e40aeea1b0b4d4e068a317c.setIcon(icon_47b29567bc3682d480f481b161884d09);
         
     
-            marker_ff60871b3ee02033e00aab28eb00c669.bindTooltip(
+            marker_5d5fdb235e40aeea1b0b4d4e068a317c.bindTooltip(
                 `<div>
                      <span data-bid="361973531" data-bname="Building 361973531">Building 361973531</span>
                  </div>`,
@@ -850,19 +877,19 @@ function showPathOnMap(buildingId, pathIndex) {
             );
         
     
-            var marker_a4cd0a58403be00b76c29fbb9b976298 = L.marker(
+            var marker_6d84c41155d4f8e0d2c39f899518ceaf = L.marker(
                 [31.2693719, 34.8001365],
                 {}
-            ).addTo(map_9bbac5976436722e6b84a5cb33dda288);
+            ).addTo(map_d9707c4db0f907381814424872f25027);
         
     
-            var icon_1d4cb210a2eb4347b1e80675d4e04d62 = L.AwesomeMarkers.icon(
+            var icon_34a66517f23be5fb299dd48c540226d4 = L.AwesomeMarkers.icon(
                 {"extraClasses": "fa-rotate-0", "icon": "home", "iconColor": "white", "markerColor": "blue", "prefix": "fa"}
             );
-            marker_a4cd0a58403be00b76c29fbb9b976298.setIcon(icon_1d4cb210a2eb4347b1e80675d4e04d62);
+            marker_6d84c41155d4f8e0d2c39f899518ceaf.setIcon(icon_34a66517f23be5fb299dd48c540226d4);
         
     
-            marker_a4cd0a58403be00b76c29fbb9b976298.bindTooltip(
+            marker_6d84c41155d4f8e0d2c39f899518ceaf.bindTooltip(
                 `<div>
                      <span data-bid="361973532" data-bname="Building 361973532">Building 361973532</span>
                  </div>`,
@@ -870,19 +897,19 @@ function showPathOnMap(buildingId, pathIndex) {
             );
         
     
-            var marker_c3fb464e2d9f86416f0426068354e714 = L.marker(
+            var marker_eff269d0b5b6b749a66715b83c9977a7 = L.marker(
                 [31.2684278, 34.7986144],
                 {}
-            ).addTo(map_9bbac5976436722e6b84a5cb33dda288);
+            ).addTo(map_d9707c4db0f907381814424872f25027);
         
     
-            var icon_d54bf66ed0da281fd6067922704fc183 = L.AwesomeMarkers.icon(
+            var icon_fa267f4f6ff45de1bc0a12278e468336 = L.AwesomeMarkers.icon(
                 {"extraClasses": "fa-rotate-0", "icon": "home", "iconColor": "white", "markerColor": "blue", "prefix": "fa"}
             );
-            marker_c3fb464e2d9f86416f0426068354e714.setIcon(icon_d54bf66ed0da281fd6067922704fc183);
+            marker_eff269d0b5b6b749a66715b83c9977a7.setIcon(icon_fa267f4f6ff45de1bc0a12278e468336);
         
     
-            marker_c3fb464e2d9f86416f0426068354e714.bindTooltip(
+            marker_eff269d0b5b6b749a66715b83c9977a7.bindTooltip(
                 `<div>
                      <span data-bid="361973536" data-bname="Building 361973536">Building 361973536</span>
                  </div>`,
@@ -890,19 +917,19 @@ function showPathOnMap(buildingId, pathIndex) {
             );
         
     
-            var marker_7dd129710dd923437d30f5d1465fa3cb = L.marker(
+            var marker_d015f7529cf378b1b3d58743fa2ebf1a = L.marker(
                 [31.2678446, 34.7989951],
                 {}
-            ).addTo(map_9bbac5976436722e6b84a5cb33dda288);
+            ).addTo(map_d9707c4db0f907381814424872f25027);
         
     
-            var icon_671cc317d9945ffcfef796c6d16c7425 = L.AwesomeMarkers.icon(
+            var icon_9ad87632216209626e9555cde55f52b4 = L.AwesomeMarkers.icon(
                 {"extraClasses": "fa-rotate-0", "icon": "home", "iconColor": "white", "markerColor": "blue", "prefix": "fa"}
             );
-            marker_7dd129710dd923437d30f5d1465fa3cb.setIcon(icon_671cc317d9945ffcfef796c6d16c7425);
+            marker_d015f7529cf378b1b3d58743fa2ebf1a.setIcon(icon_9ad87632216209626e9555cde55f52b4);
         
     
-            marker_7dd129710dd923437d30f5d1465fa3cb.bindTooltip(
+            marker_d015f7529cf378b1b3d58743fa2ebf1a.bindTooltip(
                 `<div>
                      <span data-bid="361973537" data-bname="Building 361973537">Building 361973537</span>
                  </div>`,
@@ -910,19 +937,19 @@ function showPathOnMap(buildingId, pathIndex) {
             );
         
     
-            var marker_b0aeceb558b917615847ae142d37c31c = L.marker(
+            var marker_749217226c60577a92ae395ecf739768 = L.marker(
                 [31.2690142, 34.7991191],
                 {}
-            ).addTo(map_9bbac5976436722e6b84a5cb33dda288);
+            ).addTo(map_d9707c4db0f907381814424872f25027);
         
     
-            var icon_b58f8c15f62abe4cd21e1eb2c89b7ad5 = L.AwesomeMarkers.icon(
+            var icon_28d482661f903bf7e3b91830d7d9ebd6 = L.AwesomeMarkers.icon(
                 {"extraClasses": "fa-rotate-0", "icon": "home", "iconColor": "white", "markerColor": "blue", "prefix": "fa"}
             );
-            marker_b0aeceb558b917615847ae142d37c31c.setIcon(icon_b58f8c15f62abe4cd21e1eb2c89b7ad5);
+            marker_749217226c60577a92ae395ecf739768.setIcon(icon_28d482661f903bf7e3b91830d7d9ebd6);
         
     
-            marker_b0aeceb558b917615847ae142d37c31c.bindTooltip(
+            marker_749217226c60577a92ae395ecf739768.bindTooltip(
                 `<div>
                      <span data-bid="361973538" data-bname="Building 361973538">Building 361973538</span>
                  </div>`,
@@ -930,19 +957,19 @@ function showPathOnMap(buildingId, pathIndex) {
             );
         
     
-            var marker_00684333bb10e550f765b5e4499829b9 = L.marker(
+            var marker_fef6f72475c2919f266f4aee6d677c4d = L.marker(
                 [31.269183, 34.7985247],
                 {}
-            ).addTo(map_9bbac5976436722e6b84a5cb33dda288);
+            ).addTo(map_d9707c4db0f907381814424872f25027);
         
     
-            var icon_03407eedafff32a91d685917a7d637b8 = L.AwesomeMarkers.icon(
+            var icon_afcc7a3ddd940e518afae6ee018664da = L.AwesomeMarkers.icon(
                 {"extraClasses": "fa-rotate-0", "icon": "home", "iconColor": "white", "markerColor": "blue", "prefix": "fa"}
             );
-            marker_00684333bb10e550f765b5e4499829b9.setIcon(icon_03407eedafff32a91d685917a7d637b8);
+            marker_fef6f72475c2919f266f4aee6d677c4d.setIcon(icon_afcc7a3ddd940e518afae6ee018664da);
         
     
-            marker_00684333bb10e550f765b5e4499829b9.bindTooltip(
+            marker_fef6f72475c2919f266f4aee6d677c4d.bindTooltip(
                 `<div>
                      <span data-bid="361973539" data-bname="Building 361973539">Building 361973539</span>
                  </div>`,
@@ -950,19 +977,19 @@ function showPathOnMap(buildingId, pathIndex) {
             );
         
     
-            var marker_70d55861a362ebaa2cd74d368a2d24f3 = L.marker(
+            var marker_330561b9586c67a5d11d9fc8490f4782 = L.marker(
                 [31.2699287, 34.8003074],
                 {}
-            ).addTo(map_9bbac5976436722e6b84a5cb33dda288);
+            ).addTo(map_d9707c4db0f907381814424872f25027);
         
     
-            var icon_a3f67da45f67c1e182667e014f220e8d = L.AwesomeMarkers.icon(
+            var icon_7bbe069351e1c611d95264b33c79ae80 = L.AwesomeMarkers.icon(
                 {"extraClasses": "fa-rotate-0", "icon": "home", "iconColor": "white", "markerColor": "blue", "prefix": "fa"}
             );
-            marker_70d55861a362ebaa2cd74d368a2d24f3.setIcon(icon_a3f67da45f67c1e182667e014f220e8d);
+            marker_330561b9586c67a5d11d9fc8490f4782.setIcon(icon_7bbe069351e1c611d95264b33c79ae80);
         
     
-            marker_70d55861a362ebaa2cd74d368a2d24f3.bindTooltip(
+            marker_330561b9586c67a5d11d9fc8490f4782.bindTooltip(
                 `<div>
                      <span data-bid="361973542" data-bname="Building 361973542">Building 361973542</span>
                  </div>`,
@@ -970,19 +997,19 @@ function showPathOnMap(buildingId, pathIndex) {
             );
         
     
-            var marker_245650e956cd00e564bc4868f0517bba = L.marker(
+            var marker_cae860ab97bc58b3788af26b64714d54 = L.marker(
                 [31.2684165, 34.8001245],
                 {}
-            ).addTo(map_9bbac5976436722e6b84a5cb33dda288);
+            ).addTo(map_d9707c4db0f907381814424872f25027);
         
     
-            var icon_0f33e1bfc2f3bedcf6a3064d28ab8b64 = L.AwesomeMarkers.icon(
+            var icon_547c5703798f786f40e91f2992aa9121 = L.AwesomeMarkers.icon(
                 {"extraClasses": "fa-rotate-0", "icon": "home", "iconColor": "white", "markerColor": "blue", "prefix": "fa"}
             );
-            marker_245650e956cd00e564bc4868f0517bba.setIcon(icon_0f33e1bfc2f3bedcf6a3064d28ab8b64);
+            marker_cae860ab97bc58b3788af26b64714d54.setIcon(icon_547c5703798f786f40e91f2992aa9121);
         
     
-            marker_245650e956cd00e564bc4868f0517bba.bindTooltip(
+            marker_cae860ab97bc58b3788af26b64714d54.bindTooltip(
                 `<div>
                      <span data-bid="361973543" data-bname="Building 361973543">Building 361973543</span>
                  </div>`,
@@ -990,19 +1017,19 @@ function showPathOnMap(buildingId, pathIndex) {
             );
         
     
-            var marker_f4f96001ff6087046db272bb891793ca = L.marker(
+            var marker_ce868d378040e825cb2a44ec71582ffb = L.marker(
                 [31.268144, 34.7983511],
                 {}
-            ).addTo(map_9bbac5976436722e6b84a5cb33dda288);
+            ).addTo(map_d9707c4db0f907381814424872f25027);
         
     
-            var icon_a9fe87b33f6b7aaa352ed0bc2307e01a = L.AwesomeMarkers.icon(
+            var icon_f30d65bb7987435ede6154bc6737039c = L.AwesomeMarkers.icon(
                 {"extraClasses": "fa-rotate-0", "icon": "home", "iconColor": "white", "markerColor": "blue", "prefix": "fa"}
             );
-            marker_f4f96001ff6087046db272bb891793ca.setIcon(icon_a9fe87b33f6b7aaa352ed0bc2307e01a);
+            marker_ce868d378040e825cb2a44ec71582ffb.setIcon(icon_f30d65bb7987435ede6154bc6737039c);
         
     
-            marker_f4f96001ff6087046db272bb891793ca.bindTooltip(
+            marker_ce868d378040e825cb2a44ec71582ffb.bindTooltip(
                 `<div>
                      <span data-bid="361973544" data-bname="Building 361973544">Building 361973544</span>
                  </div>`,
@@ -1010,19 +1037,19 @@ function showPathOnMap(buildingId, pathIndex) {
             );
         
     
-            var marker_ff04bf6341d1fd6712c53ebd95067532 = L.marker(
+            var marker_da2ad24f953bb28e47deed6238017310 = L.marker(
                 [31.2676982, 34.799364],
                 {}
-            ).addTo(map_9bbac5976436722e6b84a5cb33dda288);
+            ).addTo(map_d9707c4db0f907381814424872f25027);
         
     
-            var icon_989939ff29f2ea4b54d6502cd549d5bb = L.AwesomeMarkers.icon(
+            var icon_1dc5cacdb429b8cbb33da1cc57f1be84 = L.AwesomeMarkers.icon(
                 {"extraClasses": "fa-rotate-0", "icon": "home", "iconColor": "white", "markerColor": "blue", "prefix": "fa"}
             );
-            marker_ff04bf6341d1fd6712c53ebd95067532.setIcon(icon_989939ff29f2ea4b54d6502cd549d5bb);
+            marker_da2ad24f953bb28e47deed6238017310.setIcon(icon_1dc5cacdb429b8cbb33da1cc57f1be84);
         
     
-            marker_ff04bf6341d1fd6712c53ebd95067532.bindTooltip(
+            marker_da2ad24f953bb28e47deed6238017310.bindTooltip(
                 `<div>
                      <span data-bid="361973545" data-bname="Building 361973545">Building 361973545</span>
                  </div>`,
@@ -1030,19 +1057,19 @@ function showPathOnMap(buildingId, pathIndex) {
             );
         
     
-            var marker_f92f9fab4183d4e7cfddfda153cabad5 = L.marker(
+            var marker_990c94572bfe4f9d8642131d6e419b19 = L.marker(
                 [31.2696618, 34.8006823],
                 {}
-            ).addTo(map_9bbac5976436722e6b84a5cb33dda288);
+            ).addTo(map_d9707c4db0f907381814424872f25027);
         
     
-            var icon_93d231662c306d78bb0f42f0a26d4c8a = L.AwesomeMarkers.icon(
+            var icon_8416bbe61e26a4798bed8d00592547fb = L.AwesomeMarkers.icon(
                 {"extraClasses": "fa-rotate-0", "icon": "home", "iconColor": "white", "markerColor": "blue", "prefix": "fa"}
             );
-            marker_f92f9fab4183d4e7cfddfda153cabad5.setIcon(icon_93d231662c306d78bb0f42f0a26d4c8a);
+            marker_990c94572bfe4f9d8642131d6e419b19.setIcon(icon_8416bbe61e26a4798bed8d00592547fb);
         
     
-            marker_f92f9fab4183d4e7cfddfda153cabad5.bindTooltip(
+            marker_990c94572bfe4f9d8642131d6e419b19.bindTooltip(
                 `<div>
                      <span data-bid="361973547" data-bname="Building 361973547">Building 361973547</span>
                  </div>`,
@@ -1050,19 +1077,19 @@ function showPathOnMap(buildingId, pathIndex) {
             );
         
     
-            var marker_30bfe7e1a09bc83b4d1c858c6d64810f = L.marker(
+            var marker_093253f76492f10e8771c123cb55fe16 = L.marker(
                 [31.2676842, 34.800137],
                 {}
-            ).addTo(map_9bbac5976436722e6b84a5cb33dda288);
+            ).addTo(map_d9707c4db0f907381814424872f25027);
         
     
-            var icon_2dafc11e807dba8f2b13e66eb67087c3 = L.AwesomeMarkers.icon(
+            var icon_d8179689afc159dc8917ecd2d7a5d443 = L.AwesomeMarkers.icon(
                 {"extraClasses": "fa-rotate-0", "icon": "home", "iconColor": "white", "markerColor": "blue", "prefix": "fa"}
             );
-            marker_30bfe7e1a09bc83b4d1c858c6d64810f.setIcon(icon_2dafc11e807dba8f2b13e66eb67087c3);
+            marker_093253f76492f10e8771c123cb55fe16.setIcon(icon_d8179689afc159dc8917ecd2d7a5d443);
         
     
-            marker_30bfe7e1a09bc83b4d1c858c6d64810f.bindTooltip(
+            marker_093253f76492f10e8771c123cb55fe16.bindTooltip(
                 `<div>
                      <span data-bid="361973550" data-bname="Building 361973550">Building 361973550</span>
                  </div>`,
@@ -1070,19 +1097,19 @@ function showPathOnMap(buildingId, pathIndex) {
             );
         
     
-            var marker_655f8aa3b8c2cff072ef007f13a0b1aa = L.marker(
+            var marker_fe4e558facbd68046a774a758918fc36 = L.marker(
                 [31.2675663, 34.7983511],
                 {}
-            ).addTo(map_9bbac5976436722e6b84a5cb33dda288);
+            ).addTo(map_d9707c4db0f907381814424872f25027);
         
     
-            var icon_fccb15f7808520370a5800a7974c1e0b = L.AwesomeMarkers.icon(
+            var icon_f38f84ce622b1890a9a0c97963063606 = L.AwesomeMarkers.icon(
                 {"extraClasses": "fa-rotate-0", "icon": "home", "iconColor": "white", "markerColor": "blue", "prefix": "fa"}
             );
-            marker_655f8aa3b8c2cff072ef007f13a0b1aa.setIcon(icon_fccb15f7808520370a5800a7974c1e0b);
+            marker_fe4e558facbd68046a774a758918fc36.setIcon(icon_f38f84ce622b1890a9a0c97963063606);
         
     
-            marker_655f8aa3b8c2cff072ef007f13a0b1aa.bindTooltip(
+            marker_fe4e558facbd68046a774a758918fc36.bindTooltip(
                 `<div>
                      <span data-bid="361973551" data-bname="Building 361973551">Building 361973551</span>
                  </div>`,
@@ -1090,19 +1117,19 @@ function showPathOnMap(buildingId, pathIndex) {
             );
         
     
-            var marker_da219bb3e3e1082012d985c4e0f13639 = L.marker(
+            var marker_42af951605298f3729034484c4a3dd8f = L.marker(
                 [31.2689465, 34.7988659],
                 {}
-            ).addTo(map_9bbac5976436722e6b84a5cb33dda288);
+            ).addTo(map_d9707c4db0f907381814424872f25027);
         
     
-            var icon_0f78d8a9bd4cc719e370a4a1eaab1e57 = L.AwesomeMarkers.icon(
+            var icon_25f8f274a527b74f809fc24e09b37b7a = L.AwesomeMarkers.icon(
                 {"extraClasses": "fa-rotate-0", "icon": "home", "iconColor": "white", "markerColor": "blue", "prefix": "fa"}
             );
-            marker_da219bb3e3e1082012d985c4e0f13639.setIcon(icon_0f78d8a9bd4cc719e370a4a1eaab1e57);
+            marker_42af951605298f3729034484c4a3dd8f.setIcon(icon_25f8f274a527b74f809fc24e09b37b7a);
         
     
-            marker_da219bb3e3e1082012d985c4e0f13639.bindTooltip(
+            marker_42af951605298f3729034484c4a3dd8f.bindTooltip(
                 `<div>
                      <span data-bid="361973555" data-bname="Building 361973555">Building 361973555</span>
                  </div>`,
@@ -1110,19 +1137,19 @@ function showPathOnMap(buildingId, pathIndex) {
             );
         
     
-            var marker_7f556cb7157e2a21d18e0e6fb01a3ce4 = L.marker(
+            var marker_a90b78f76683f6e50095c04bcb4bdc29 = L.marker(
                 [31.2687264, 34.7983403],
                 {}
-            ).addTo(map_9bbac5976436722e6b84a5cb33dda288);
+            ).addTo(map_d9707c4db0f907381814424872f25027);
         
     
-            var icon_a8e3f5942f2732b44cfa603d63add43e = L.AwesomeMarkers.icon(
+            var icon_85c584d79ac9b00156917efe4f6f2a13 = L.AwesomeMarkers.icon(
                 {"extraClasses": "fa-rotate-0", "icon": "home", "iconColor": "white", "markerColor": "blue", "prefix": "fa"}
             );
-            marker_7f556cb7157e2a21d18e0e6fb01a3ce4.setIcon(icon_a8e3f5942f2732b44cfa603d63add43e);
+            marker_a90b78f76683f6e50095c04bcb4bdc29.setIcon(icon_85c584d79ac9b00156917efe4f6f2a13);
         
     
-            marker_7f556cb7157e2a21d18e0e6fb01a3ce4.bindTooltip(
+            marker_a90b78f76683f6e50095c04bcb4bdc29.bindTooltip(
                 `<div>
                      <span data-bid="361973557" data-bname="Building 361973557">Building 361973557</span>
                  </div>`,
@@ -1130,19 +1157,19 @@ function showPathOnMap(buildingId, pathIndex) {
             );
         
     
-            var marker_caead9895b1ba35dea5b54719150a023 = L.marker(
+            var marker_8d06f9e278bfb600b1515203965a3868 = L.marker(
                 [31.2696149, 34.8001205],
                 {}
-            ).addTo(map_9bbac5976436722e6b84a5cb33dda288);
+            ).addTo(map_d9707c4db0f907381814424872f25027);
         
     
-            var icon_ab18e7902e61ef8464d14cf2bcd24143 = L.AwesomeMarkers.icon(
+            var icon_cd34f06d08b0b98aed4f70a9906cafc9 = L.AwesomeMarkers.icon(
                 {"extraClasses": "fa-rotate-0", "icon": "home", "iconColor": "white", "markerColor": "blue", "prefix": "fa"}
             );
-            marker_caead9895b1ba35dea5b54719150a023.setIcon(icon_ab18e7902e61ef8464d14cf2bcd24143);
+            marker_8d06f9e278bfb600b1515203965a3868.setIcon(icon_cd34f06d08b0b98aed4f70a9906cafc9);
         
     
-            marker_caead9895b1ba35dea5b54719150a023.bindTooltip(
+            marker_8d06f9e278bfb600b1515203965a3868.bindTooltip(
                 `<div>
                      <span data-bid="361973564" data-bname="Building 361973564">Building 361973564</span>
                  </div>`,
@@ -1150,19 +1177,19 @@ function showPathOnMap(buildingId, pathIndex) {
             );
         
     
-            var marker_9ed34501321821eecee2e0fa00bec1f8 = L.marker(
+            var marker_420784f4004483f2b6d5caf6d7d3d499 = L.marker(
                 [31.2674599, 34.7993479],
                 {}
-            ).addTo(map_9bbac5976436722e6b84a5cb33dda288);
+            ).addTo(map_d9707c4db0f907381814424872f25027);
         
     
-            var icon_90fc6201400efa01aa09e3037540a7c3 = L.AwesomeMarkers.icon(
+            var icon_bd6caa906259f1c625cfe31bcdeb3e3b = L.AwesomeMarkers.icon(
                 {"extraClasses": "fa-rotate-0", "icon": "home", "iconColor": "white", "markerColor": "blue", "prefix": "fa"}
             );
-            marker_9ed34501321821eecee2e0fa00bec1f8.setIcon(icon_90fc6201400efa01aa09e3037540a7c3);
+            marker_420784f4004483f2b6d5caf6d7d3d499.setIcon(icon_bd6caa906259f1c625cfe31bcdeb3e3b);
         
     
-            marker_9ed34501321821eecee2e0fa00bec1f8.bindTooltip(
+            marker_420784f4004483f2b6d5caf6d7d3d499.bindTooltip(
                 `<div>
                      <span data-bid="361973565" data-bname="Building 361973565">Building 361973565</span>
                  </div>`,
@@ -1170,19 +1197,19 @@ function showPathOnMap(buildingId, pathIndex) {
             );
         
     
-            var marker_2d8853c04bdeb1a857d1f0282b392c50 = L.marker(
+            var marker_be1d9790368b35b8d5038a2d8be855a3 = L.marker(
                 [31.2681438, 34.7987069],
                 {}
-            ).addTo(map_9bbac5976436722e6b84a5cb33dda288);
+            ).addTo(map_d9707c4db0f907381814424872f25027);
         
     
-            var icon_3db0ac2ce341cc13f34f28dbe685117f = L.AwesomeMarkers.icon(
+            var icon_32a455958229206b64f16652e194e0cc = L.AwesomeMarkers.icon(
                 {"extraClasses": "fa-rotate-0", "icon": "home", "iconColor": "white", "markerColor": "blue", "prefix": "fa"}
             );
-            marker_2d8853c04bdeb1a857d1f0282b392c50.setIcon(icon_3db0ac2ce341cc13f34f28dbe685117f);
+            marker_be1d9790368b35b8d5038a2d8be855a3.setIcon(icon_32a455958229206b64f16652e194e0cc);
         
     
-            marker_2d8853c04bdeb1a857d1f0282b392c50.bindTooltip(
+            marker_be1d9790368b35b8d5038a2d8be855a3.bindTooltip(
                 `<div>
                      <span data-bid="361973568" data-bname="Building 361973568">Building 361973568</span>
                  </div>`,
@@ -1190,19 +1217,19 @@ function showPathOnMap(buildingId, pathIndex) {
             );
         
     
-            var marker_0685aa2590ead3c97b573867e53b0102 = L.marker(
+            var marker_a230201719e5ca14b1e68a63977d2d1e = L.marker(
                 [31.2687308, 34.799365],
                 {}
-            ).addTo(map_9bbac5976436722e6b84a5cb33dda288);
+            ).addTo(map_d9707c4db0f907381814424872f25027);
         
     
-            var icon_bc49717c9daa3d6bec461cad3b65aa4d = L.AwesomeMarkers.icon(
+            var icon_7566216fe2a4e29c9ef23527e9c78a77 = L.AwesomeMarkers.icon(
                 {"extraClasses": "fa-rotate-0", "icon": "home", "iconColor": "white", "markerColor": "blue", "prefix": "fa"}
             );
-            marker_0685aa2590ead3c97b573867e53b0102.setIcon(icon_bc49717c9daa3d6bec461cad3b65aa4d);
+            marker_a230201719e5ca14b1e68a63977d2d1e.setIcon(icon_7566216fe2a4e29c9ef23527e9c78a77);
         
     
-            marker_0685aa2590ead3c97b573867e53b0102.bindTooltip(
+            marker_a230201719e5ca14b1e68a63977d2d1e.bindTooltip(
                 `<div>
                      <span data-bid="361973569" data-bname="Building 361973569">Building 361973569</span>
                  </div>`,
@@ -1210,19 +1237,19 @@ function showPathOnMap(buildingId, pathIndex) {
             );
         
     
-            var marker_8b0d4354aacde6ac7e23fc17fcdfdac5 = L.marker(
+            var marker_b3f38c26ed65d7b4b14f833c2467dcd3 = L.marker(
                 [31.2694233, 34.8008538],
                 {}
-            ).addTo(map_9bbac5976436722e6b84a5cb33dda288);
+            ).addTo(map_d9707c4db0f907381814424872f25027);
         
     
-            var icon_77fe422464d6c49bd53efc4868fcc954 = L.AwesomeMarkers.icon(
+            var icon_902cbf215ae7ca9052932d6d22d68a5a = L.AwesomeMarkers.icon(
                 {"extraClasses": "fa-rotate-0", "icon": "home", "iconColor": "white", "markerColor": "blue", "prefix": "fa"}
             );
-            marker_8b0d4354aacde6ac7e23fc17fcdfdac5.setIcon(icon_77fe422464d6c49bd53efc4868fcc954);
+            marker_b3f38c26ed65d7b4b14f833c2467dcd3.setIcon(icon_902cbf215ae7ca9052932d6d22d68a5a);
         
     
-            marker_8b0d4354aacde6ac7e23fc17fcdfdac5.bindTooltip(
+            marker_b3f38c26ed65d7b4b14f833c2467dcd3.bindTooltip(
                 `<div>
                      <span data-bid="361973575" data-bname="Building 361973575">Building 361973575</span>
                  </div>`,
@@ -1230,19 +1257,19 @@ function showPathOnMap(buildingId, pathIndex) {
             );
         
     
-            var marker_1736df254279a3a55d6939fd995a79e6 = L.marker(
+            var marker_8c1ac808a9c621735d8793ed93a44d92 = L.marker(
                 [31.2688522, 34.7985606],
                 {}
-            ).addTo(map_9bbac5976436722e6b84a5cb33dda288);
+            ).addTo(map_d9707c4db0f907381814424872f25027);
         
     
-            var icon_ca47821670e4cfbe981058d4ab05f0eb = L.AwesomeMarkers.icon(
+            var icon_08a2b5b6e667384b80b86ff92f725cf4 = L.AwesomeMarkers.icon(
                 {"extraClasses": "fa-rotate-0", "icon": "home", "iconColor": "white", "markerColor": "blue", "prefix": "fa"}
             );
-            marker_1736df254279a3a55d6939fd995a79e6.setIcon(icon_ca47821670e4cfbe981058d4ab05f0eb);
+            marker_8c1ac808a9c621735d8793ed93a44d92.setIcon(icon_08a2b5b6e667384b80b86ff92f725cf4);
         
     
-            marker_1736df254279a3a55d6939fd995a79e6.bindTooltip(
+            marker_8c1ac808a9c621735d8793ed93a44d92.bindTooltip(
                 `<div>
                      <span data-bid="361973576" data-bname="Building 361973576">Building 361973576</span>
                  </div>`,
@@ -1250,19 +1277,19 @@ function showPathOnMap(buildingId, pathIndex) {
             );
         
     
-            var marker_f0b92ab6d498390bb8ec98e0296ce7ba = L.marker(
+            var marker_34ebb46fbec69983e95b8fd06d9c9eb5 = L.marker(
                 [31.2681032, 34.798925],
                 {}
-            ).addTo(map_9bbac5976436722e6b84a5cb33dda288);
+            ).addTo(map_d9707c4db0f907381814424872f25027);
         
     
-            var icon_239293655f515e7c5d28018e003b5280 = L.AwesomeMarkers.icon(
+            var icon_f5c3d8f247b0a448d436e4679baa9a80 = L.AwesomeMarkers.icon(
                 {"extraClasses": "fa-rotate-0", "icon": "home", "iconColor": "white", "markerColor": "blue", "prefix": "fa"}
             );
-            marker_f0b92ab6d498390bb8ec98e0296ce7ba.setIcon(icon_239293655f515e7c5d28018e003b5280);
+            marker_34ebb46fbec69983e95b8fd06d9c9eb5.setIcon(icon_f5c3d8f247b0a448d436e4679baa9a80);
         
     
-            marker_f0b92ab6d498390bb8ec98e0296ce7ba.bindTooltip(
+            marker_34ebb46fbec69983e95b8fd06d9c9eb5.bindTooltip(
                 `<div>
                      <span data-bid="361973578" data-bname="Building 361973578">Building 361973578</span>
                  </div>`,
@@ -1270,19 +1297,19 @@ function showPathOnMap(buildingId, pathIndex) {
             );
         
     
-            var marker_888fcfea65e5e3cace87360f9ec8852f = L.marker(
+            var marker_77c1f3926b40f978106714dc99476be4 = L.marker(
                 [31.2663593, 34.7997467],
                 {}
-            ).addTo(map_9bbac5976436722e6b84a5cb33dda288);
+            ).addTo(map_d9707c4db0f907381814424872f25027);
         
     
-            var icon_47acec3c92c260f1ef6c1ec8fa77e7d0 = L.AwesomeMarkers.icon(
+            var icon_f02bbc18c3562a1d94d30b18a55d46c8 = L.AwesomeMarkers.icon(
                 {"extraClasses": "fa-rotate-0", "icon": "home", "iconColor": "white", "markerColor": "blue", "prefix": "fa"}
             );
-            marker_888fcfea65e5e3cace87360f9ec8852f.setIcon(icon_47acec3c92c260f1ef6c1ec8fa77e7d0);
+            marker_77c1f3926b40f978106714dc99476be4.setIcon(icon_f02bbc18c3562a1d94d30b18a55d46c8);
         
     
-            marker_888fcfea65e5e3cace87360f9ec8852f.bindTooltip(
+            marker_77c1f3926b40f978106714dc99476be4.bindTooltip(
                 `<div>
                      <span data-bid="361974522" data-bname="Building 361974522">Building 361974522</span>
                  </div>`,
@@ -1290,19 +1317,19 @@ function showPathOnMap(buildingId, pathIndex) {
             );
         
     
-            var marker_5489060dabd6a86805ca9c45744bfeb5 = L.marker(
+            var marker_5d0a645ddc3d1625efde79cbc671ec07 = L.marker(
                 [31.2666308, 34.7990566],
                 {}
-            ).addTo(map_9bbac5976436722e6b84a5cb33dda288);
+            ).addTo(map_d9707c4db0f907381814424872f25027);
         
     
-            var icon_bfe02c352a1e69353bd892cde677da8a = L.AwesomeMarkers.icon(
+            var icon_ec16694d454dc267b9885bfcdc5bad11 = L.AwesomeMarkers.icon(
                 {"extraClasses": "fa-rotate-0", "icon": "home", "iconColor": "white", "markerColor": "blue", "prefix": "fa"}
             );
-            marker_5489060dabd6a86805ca9c45744bfeb5.setIcon(icon_bfe02c352a1e69353bd892cde677da8a);
+            marker_5d0a645ddc3d1625efde79cbc671ec07.setIcon(icon_ec16694d454dc267b9885bfcdc5bad11);
         
     
-            marker_5489060dabd6a86805ca9c45744bfeb5.bindTooltip(
+            marker_5d0a645ddc3d1625efde79cbc671ec07.bindTooltip(
                 `<div>
                      <span data-bid="361974523" data-bname="Building 361974523">Building 361974523</span>
                  </div>`,
@@ -1310,19 +1337,19 @@ function showPathOnMap(buildingId, pathIndex) {
             );
         
     
-            var marker_64a0de1ebf9d5a91b78e114b389123fd = L.marker(
+            var marker_b9e377b41557151437d5ba1bd4a47c69 = L.marker(
                 [31.2670792, 34.8000578],
                 {}
-            ).addTo(map_9bbac5976436722e6b84a5cb33dda288);
+            ).addTo(map_d9707c4db0f907381814424872f25027);
         
     
-            var icon_3e8324f6cbfed5603fd193c3184b75c6 = L.AwesomeMarkers.icon(
+            var icon_81629faaa678c1fec3a01248499da48e = L.AwesomeMarkers.icon(
                 {"extraClasses": "fa-rotate-0", "icon": "home", "iconColor": "white", "markerColor": "blue", "prefix": "fa"}
             );
-            marker_64a0de1ebf9d5a91b78e114b389123fd.setIcon(icon_3e8324f6cbfed5603fd193c3184b75c6);
+            marker_b9e377b41557151437d5ba1bd4a47c69.setIcon(icon_81629faaa678c1fec3a01248499da48e);
         
     
-            marker_64a0de1ebf9d5a91b78e114b389123fd.bindTooltip(
+            marker_b9e377b41557151437d5ba1bd4a47c69.bindTooltip(
                 `<div>
                      <span data-bid="361974527" data-bname="Building 361974527">Building 361974527</span>
                  </div>`,
@@ -1330,19 +1357,19 @@ function showPathOnMap(buildingId, pathIndex) {
             );
         
     
-            var marker_282e218cf999d58c2d5bac694fe4acb8 = L.marker(
+            var marker_ac2e7cc7b56384db1b1e9663bf0504a9 = L.marker(
                 [31.2668782, 34.7996817],
                 {}
-            ).addTo(map_9bbac5976436722e6b84a5cb33dda288);
+            ).addTo(map_d9707c4db0f907381814424872f25027);
         
     
-            var icon_6e4318aae4ae08d2b1ea1c0882431f15 = L.AwesomeMarkers.icon(
+            var icon_1829d56cc2e6ae2b6e91b5c49f1a8e6f = L.AwesomeMarkers.icon(
                 {"extraClasses": "fa-rotate-0", "icon": "home", "iconColor": "white", "markerColor": "blue", "prefix": "fa"}
             );
-            marker_282e218cf999d58c2d5bac694fe4acb8.setIcon(icon_6e4318aae4ae08d2b1ea1c0882431f15);
+            marker_ac2e7cc7b56384db1b1e9663bf0504a9.setIcon(icon_1829d56cc2e6ae2b6e91b5c49f1a8e6f);
         
     
-            marker_282e218cf999d58c2d5bac694fe4acb8.bindTooltip(
+            marker_ac2e7cc7b56384db1b1e9663bf0504a9.bindTooltip(
                 `<div>
                      <span data-bid="361974528" data-bname="Building 361974528">Building 361974528</span>
                  </div>`,
@@ -1350,19 +1377,19 @@ function showPathOnMap(buildingId, pathIndex) {
             );
         
     
-            var marker_1d70e4dce6028d590ec797a71813db42 = L.marker(
+            var marker_ffeaabf6781c0d6473c6d50601d164a6 = L.marker(
                 [31.2663502, 34.7994033],
                 {}
-            ).addTo(map_9bbac5976436722e6b84a5cb33dda288);
+            ).addTo(map_d9707c4db0f907381814424872f25027);
         
     
-            var icon_1a8f7aca52afef38ebf2ae63dae5400d = L.AwesomeMarkers.icon(
+            var icon_1db143447dd8041b3a5202e485afdeb9 = L.AwesomeMarkers.icon(
                 {"extraClasses": "fa-rotate-0", "icon": "home", "iconColor": "white", "markerColor": "blue", "prefix": "fa"}
             );
-            marker_1d70e4dce6028d590ec797a71813db42.setIcon(icon_1a8f7aca52afef38ebf2ae63dae5400d);
+            marker_ffeaabf6781c0d6473c6d50601d164a6.setIcon(icon_1db143447dd8041b3a5202e485afdeb9);
         
     
-            marker_1d70e4dce6028d590ec797a71813db42.bindTooltip(
+            marker_ffeaabf6781c0d6473c6d50601d164a6.bindTooltip(
                 `<div>
                      <span data-bid="361974530" data-bname="Building 361974530">Building 361974530</span>
                  </div>`,
@@ -1370,19 +1397,19 @@ function showPathOnMap(buildingId, pathIndex) {
             );
         
     
-            var marker_98d85bf6632f7898bcb4e467a6bede58 = L.marker(
+            var marker_4ed6b8c550ddf2375e07ec8f6983e71d = L.marker(
                 [31.2671694, 34.7986981],
                 {}
-            ).addTo(map_9bbac5976436722e6b84a5cb33dda288);
+            ).addTo(map_d9707c4db0f907381814424872f25027);
         
     
-            var icon_26b998b54b5e44dd9d0510dcc160d62d = L.AwesomeMarkers.icon(
+            var icon_1ca169f448fa3d1b31cd60cd315128cc = L.AwesomeMarkers.icon(
                 {"extraClasses": "fa-rotate-0", "icon": "home", "iconColor": "white", "markerColor": "blue", "prefix": "fa"}
             );
-            marker_98d85bf6632f7898bcb4e467a6bede58.setIcon(icon_26b998b54b5e44dd9d0510dcc160d62d);
+            marker_4ed6b8c550ddf2375e07ec8f6983e71d.setIcon(icon_1ca169f448fa3d1b31cd60cd315128cc);
         
     
-            marker_98d85bf6632f7898bcb4e467a6bede58.bindTooltip(
+            marker_4ed6b8c550ddf2375e07ec8f6983e71d.bindTooltip(
                 `<div>
                      <span data-bid="361974531" data-bname="Building 361974531">Building 361974531</span>
                  </div>`,
@@ -1390,19 +1417,19 @@ function showPathOnMap(buildingId, pathIndex) {
             );
         
     
-            var marker_2847ba6eca514cf1851f95266a7d53a4 = L.marker(
+            var marker_ab2e506cc1391a96be8a23c1e5f192f9 = L.marker(
                 [31.2666711, 34.7993979],
                 {}
-            ).addTo(map_9bbac5976436722e6b84a5cb33dda288);
+            ).addTo(map_d9707c4db0f907381814424872f25027);
         
     
-            var icon_e3f0c8a39a1a4d4ba9d6f234e83f5b95 = L.AwesomeMarkers.icon(
+            var icon_7582cba819bbfc83fca062e195be50c8 = L.AwesomeMarkers.icon(
                 {"extraClasses": "fa-rotate-0", "icon": "home", "iconColor": "white", "markerColor": "blue", "prefix": "fa"}
             );
-            marker_2847ba6eca514cf1851f95266a7d53a4.setIcon(icon_e3f0c8a39a1a4d4ba9d6f234e83f5b95);
+            marker_ab2e506cc1391a96be8a23c1e5f192f9.setIcon(icon_7582cba819bbfc83fca062e195be50c8);
         
     
-            marker_2847ba6eca514cf1851f95266a7d53a4.bindTooltip(
+            marker_ab2e506cc1391a96be8a23c1e5f192f9.bindTooltip(
                 `<div>
                      <span data-bid="361974539" data-bname="Building 361974539">Building 361974539</span>
                  </div>`,
@@ -1410,19 +1437,19 @@ function showPathOnMap(buildingId, pathIndex) {
             );
         
     
-            var marker_e3c3208a84b621eb3b146a6f18f06fb4 = L.marker(
+            var marker_802bd8e4696e9dc12b02bac2012ca8b6 = L.marker(
                 [31.2671431, 34.7995277],
                 {}
-            ).addTo(map_9bbac5976436722e6b84a5cb33dda288);
+            ).addTo(map_d9707c4db0f907381814424872f25027);
         
     
-            var icon_3969b40d89ad71c974e1e3a7fb02e00a = L.AwesomeMarkers.icon(
+            var icon_4baa47d991856d2fb8c137362de56b65 = L.AwesomeMarkers.icon(
                 {"extraClasses": "fa-rotate-0", "icon": "home", "iconColor": "white", "markerColor": "blue", "prefix": "fa"}
             );
-            marker_e3c3208a84b621eb3b146a6f18f06fb4.setIcon(icon_3969b40d89ad71c974e1e3a7fb02e00a);
+            marker_802bd8e4696e9dc12b02bac2012ca8b6.setIcon(icon_4baa47d991856d2fb8c137362de56b65);
         
     
-            marker_e3c3208a84b621eb3b146a6f18f06fb4.bindTooltip(
+            marker_802bd8e4696e9dc12b02bac2012ca8b6.bindTooltip(
                 `<div>
                      <span data-bid="361974540" data-bname="רופא תעסוקה">רופא תעסוקה</span>
                  </div>`,
@@ -1430,19 +1457,19 @@ function showPathOnMap(buildingId, pathIndex) {
             );
         
     
-            var marker_88412a937c9ee1f51723837506619993 = L.marker(
+            var marker_8d6d92ddf395fc31b48a328a0bd5a2a2 = L.marker(
                 [31.2663593, 34.8000953],
                 {}
-            ).addTo(map_9bbac5976436722e6b84a5cb33dda288);
+            ).addTo(map_d9707c4db0f907381814424872f25027);
         
     
-            var icon_59d996a9debb5661ec7b5f352666da2a = L.AwesomeMarkers.icon(
+            var icon_95e8c791cf85dd5a9f13d06b72e6d3bc = L.AwesomeMarkers.icon(
                 {"extraClasses": "fa-rotate-0", "icon": "home", "iconColor": "white", "markerColor": "blue", "prefix": "fa"}
             );
-            marker_88412a937c9ee1f51723837506619993.setIcon(icon_59d996a9debb5661ec7b5f352666da2a);
+            marker_8d6d92ddf395fc31b48a328a0bd5a2a2.setIcon(icon_95e8c791cf85dd5a9f13d06b72e6d3bc);
         
     
-            marker_88412a937c9ee1f51723837506619993.bindTooltip(
+            marker_8d6d92ddf395fc31b48a328a0bd5a2a2.bindTooltip(
                 `<div>
                      <span data-bid="361974541" data-bname="Building 361974541">Building 361974541</span>
                  </div>`,
@@ -1450,19 +1477,19 @@ function showPathOnMap(buildingId, pathIndex) {
             );
         
     
-            var marker_c86e91cdeae9c717ba58dec132d44c73 = L.marker(
+            var marker_a0cace1e003ca1f259af6daf849d4abb = L.marker(
                 [31.2689404, 34.8005656],
                 {}
-            ).addTo(map_9bbac5976436722e6b84a5cb33dda288);
+            ).addTo(map_d9707c4db0f907381814424872f25027);
         
     
-            var icon_abc3a2477a070e1dafd1529e253dadba = L.AwesomeMarkers.icon(
+            var icon_3c2750a37e254e29eb2da44d5abd5415 = L.AwesomeMarkers.icon(
                 {"extraClasses": "fa-rotate-0", "icon": "home", "iconColor": "white", "markerColor": "blue", "prefix": "fa"}
             );
-            marker_c86e91cdeae9c717ba58dec132d44c73.setIcon(icon_abc3a2477a070e1dafd1529e253dadba);
+            marker_a0cace1e003ca1f259af6daf849d4abb.setIcon(icon_3c2750a37e254e29eb2da44d5abd5415);
         
     
-            marker_c86e91cdeae9c717ba58dec132d44c73.bindTooltip(
+            marker_a0cace1e003ca1f259af6daf849d4abb.bindTooltip(
                 `<div>
                      <span data-bid="361974929" data-bname="Building 361974929">Building 361974929</span>
                  </div>`,
@@ -1470,19 +1497,19 @@ function showPathOnMap(buildingId, pathIndex) {
             );
         
     
-            var marker_5d908d2cca12f62f45592e457f2f2261 = L.marker(
+            var marker_d585fa4577d8f074cf19ced0c404baf7 = L.marker(
                 [31.2691399, 34.8008473],
                 {}
-            ).addTo(map_9bbac5976436722e6b84a5cb33dda288);
+            ).addTo(map_d9707c4db0f907381814424872f25027);
         
     
-            var icon_96cd84512a370916e759bf7fa06f732d = L.AwesomeMarkers.icon(
+            var icon_ef4bf0dc537c8da4feaac38bc557b79e = L.AwesomeMarkers.icon(
                 {"extraClasses": "fa-rotate-0", "icon": "home", "iconColor": "white", "markerColor": "blue", "prefix": "fa"}
             );
-            marker_5d908d2cca12f62f45592e457f2f2261.setIcon(icon_96cd84512a370916e759bf7fa06f732d);
+            marker_d585fa4577d8f074cf19ced0c404baf7.setIcon(icon_ef4bf0dc537c8da4feaac38bc557b79e);
         
     
-            marker_5d908d2cca12f62f45592e457f2f2261.bindTooltip(
+            marker_d585fa4577d8f074cf19ced0c404baf7.bindTooltip(
                 `<div>
                      <span data-bid="361974930" data-bname="Building 361974930">Building 361974930</span>
                  </div>`,
@@ -1490,19 +1517,19 @@ function showPathOnMap(buildingId, pathIndex) {
             );
         
     
-            var marker_643d0ab216e947d43c0a7ae7f1c93571 = L.marker(
+            var marker_5ac33c133b7f794d8d3fb0280c07ec11 = L.marker(
                 [31.268838, 34.8011492],
                 {}
-            ).addTo(map_9bbac5976436722e6b84a5cb33dda288);
+            ).addTo(map_d9707c4db0f907381814424872f25027);
         
     
-            var icon_2422251aedb729df2d5f48d89354321a = L.AwesomeMarkers.icon(
+            var icon_b35d59b235cf938b03240fa7f21a5ac8 = L.AwesomeMarkers.icon(
                 {"extraClasses": "fa-rotate-0", "icon": "home", "iconColor": "white", "markerColor": "blue", "prefix": "fa"}
             );
-            marker_643d0ab216e947d43c0a7ae7f1c93571.setIcon(icon_2422251aedb729df2d5f48d89354321a);
+            marker_5ac33c133b7f794d8d3fb0280c07ec11.setIcon(icon_b35d59b235cf938b03240fa7f21a5ac8);
         
     
-            marker_643d0ab216e947d43c0a7ae7f1c93571.bindTooltip(
+            marker_5ac33c133b7f794d8d3fb0280c07ec11.bindTooltip(
                 `<div>
                      <span data-bid="361974931" data-bname="Building 361974931">Building 361974931</span>
                  </div>`,
@@ -1510,19 +1537,19 @@ function showPathOnMap(buildingId, pathIndex) {
             );
         
     
-            var marker_a9d3833168018f235b72adabeedaee1e = L.marker(
+            var marker_117753eb6cb43263760b0933422ae878 = L.marker(
                 [31.2683442, 34.8006782],
                 {}
-            ).addTo(map_9bbac5976436722e6b84a5cb33dda288);
+            ).addTo(map_d9707c4db0f907381814424872f25027);
         
     
-            var icon_e7ba4ef25f491d3d87bdbf2cd25a1367 = L.AwesomeMarkers.icon(
+            var icon_3aecf109e753630e0376ca59a7437045 = L.AwesomeMarkers.icon(
                 {"extraClasses": "fa-rotate-0", "icon": "home", "iconColor": "white", "markerColor": "blue", "prefix": "fa"}
             );
-            marker_a9d3833168018f235b72adabeedaee1e.setIcon(icon_e7ba4ef25f491d3d87bdbf2cd25a1367);
+            marker_117753eb6cb43263760b0933422ae878.setIcon(icon_3aecf109e753630e0376ca59a7437045);
         
     
-            marker_a9d3833168018f235b72adabeedaee1e.bindTooltip(
+            marker_117753eb6cb43263760b0933422ae878.bindTooltip(
                 `<div>
                      <span data-bid="361974932" data-bname="Building 361974932">Building 361974932</span>
                  </div>`,
@@ -1530,19 +1557,19 @@ function showPathOnMap(buildingId, pathIndex) {
             );
         
     
-            var marker_b8632672ac7137b381957c12c56359a8 = L.marker(
+            var marker_60afbb6f2670f658c70ac1dab7603002 = L.marker(
                 [31.268739, 34.8006494],
                 {}
-            ).addTo(map_9bbac5976436722e6b84a5cb33dda288);
+            ).addTo(map_d9707c4db0f907381814424872f25027);
         
     
-            var icon_de2444d428607970a97b24085984965e = L.AwesomeMarkers.icon(
+            var icon_412ad9efbd7f98fd98022315135b4fb4 = L.AwesomeMarkers.icon(
                 {"extraClasses": "fa-rotate-0", "icon": "home", "iconColor": "white", "markerColor": "blue", "prefix": "fa"}
             );
-            marker_b8632672ac7137b381957c12c56359a8.setIcon(icon_de2444d428607970a97b24085984965e);
+            marker_60afbb6f2670f658c70ac1dab7603002.setIcon(icon_412ad9efbd7f98fd98022315135b4fb4);
         
     
-            marker_b8632672ac7137b381957c12c56359a8.bindTooltip(
+            marker_60afbb6f2670f658c70ac1dab7603002.bindTooltip(
                 `<div>
                      <span data-bid="361974933" data-bname="Building 361974933">Building 361974933</span>
                  </div>`,
@@ -1550,19 +1577,19 @@ function showPathOnMap(buildingId, pathIndex) {
             );
         
     
-            var marker_2e88e98762d1c390bab9f04c47499238 = L.marker(
+            var marker_b37367c6b63e1f4b039905dc951505ce = L.marker(
                 [31.2684311, 34.801046],
                 {}
-            ).addTo(map_9bbac5976436722e6b84a5cb33dda288);
+            ).addTo(map_d9707c4db0f907381814424872f25027);
         
     
-            var icon_02fd9d0e1486ce56fcc7004b67917985 = L.AwesomeMarkers.icon(
+            var icon_1d849f951f67caf131b3489ec3649155 = L.AwesomeMarkers.icon(
                 {"extraClasses": "fa-rotate-0", "icon": "home", "iconColor": "white", "markerColor": "blue", "prefix": "fa"}
             );
-            marker_2e88e98762d1c390bab9f04c47499238.setIcon(icon_02fd9d0e1486ce56fcc7004b67917985);
+            marker_b37367c6b63e1f4b039905dc951505ce.setIcon(icon_1d849f951f67caf131b3489ec3649155);
         
     
-            marker_2e88e98762d1c390bab9f04c47499238.bindTooltip(
+            marker_b37367c6b63e1f4b039905dc951505ce.bindTooltip(
                 `<div>
                      <span data-bid="361974934" data-bname="Building 361974934">Building 361974934</span>
                  </div>`,
@@ -1570,19 +1597,19 @@ function showPathOnMap(buildingId, pathIndex) {
             );
         
     
-            var marker_bfe5528b40b867d1e9a311679bf8092e = L.marker(
+            var marker_9e1852b6e8fb3e1ebb3bdddfe175320d = L.marker(
                 [31.2686758, 34.8010739],
                 {}
-            ).addTo(map_9bbac5976436722e6b84a5cb33dda288);
+            ).addTo(map_d9707c4db0f907381814424872f25027);
         
     
-            var icon_d7b5e78d58a344fc8086f4dc0769ad1a = L.AwesomeMarkers.icon(
+            var icon_9051e088d161c6fe3f421f3138ab961b = L.AwesomeMarkers.icon(
                 {"extraClasses": "fa-rotate-0", "icon": "home", "iconColor": "white", "markerColor": "blue", "prefix": "fa"}
             );
-            marker_bfe5528b40b867d1e9a311679bf8092e.setIcon(icon_d7b5e78d58a344fc8086f4dc0769ad1a);
+            marker_9e1852b6e8fb3e1ebb3bdddfe175320d.setIcon(icon_9051e088d161c6fe3f421f3138ab961b);
         
     
-            marker_bfe5528b40b867d1e9a311679bf8092e.bindTooltip(
+            marker_9e1852b6e8fb3e1ebb3bdddfe175320d.bindTooltip(
                 `<div>
                      <span data-bid="361974937" data-bname="Building 361974937">Building 361974937</span>
                  </div>`,
@@ -1590,19 +1617,19 @@ function showPathOnMap(buildingId, pathIndex) {
             );
         
     
-            var marker_2f05ce4148222b16dd6b573ac818cbd1 = L.marker(
+            var marker_24b9ac09702083cb74a0bc41dcdb8ba6 = L.marker(
                 [31.2689302, 34.8009934],
                 {}
-            ).addTo(map_9bbac5976436722e6b84a5cb33dda288);
+            ).addTo(map_d9707c4db0f907381814424872f25027);
         
     
-            var icon_3fa3bcb1a3a4cc4e5081541bf6b5a670 = L.AwesomeMarkers.icon(
+            var icon_97683ad5ef0a7d881a5b094a06653210 = L.AwesomeMarkers.icon(
                 {"extraClasses": "fa-rotate-0", "icon": "home", "iconColor": "white", "markerColor": "blue", "prefix": "fa"}
             );
-            marker_2f05ce4148222b16dd6b573ac818cbd1.setIcon(icon_3fa3bcb1a3a4cc4e5081541bf6b5a670);
+            marker_24b9ac09702083cb74a0bc41dcdb8ba6.setIcon(icon_97683ad5ef0a7d881a5b094a06653210);
         
     
-            marker_2f05ce4148222b16dd6b573ac818cbd1.bindTooltip(
+            marker_24b9ac09702083cb74a0bc41dcdb8ba6.bindTooltip(
                 `<div>
                      <span data-bid="361974938" data-bname="Building 361974938">Building 361974938</span>
                  </div>`,
@@ -1610,19 +1637,19 @@ function showPathOnMap(buildingId, pathIndex) {
             );
         
     
-            var marker_5502e6f5b205ae402f10351ddcbf6c09 = L.marker(
+            var marker_20d24a60eb5e5b07fe9889b8e2046e4a = L.marker(
                 [31.2678229, 34.8011437],
                 {}
-            ).addTo(map_9bbac5976436722e6b84a5cb33dda288);
+            ).addTo(map_d9707c4db0f907381814424872f25027);
         
     
-            var icon_63dc30e13af1a65b789803986f165254 = L.AwesomeMarkers.icon(
+            var icon_6e3685dcec7580f73ecbf25177d962df = L.AwesomeMarkers.icon(
                 {"extraClasses": "fa-rotate-0", "icon": "home", "iconColor": "white", "markerColor": "blue", "prefix": "fa"}
             );
-            marker_5502e6f5b205ae402f10351ddcbf6c09.setIcon(icon_63dc30e13af1a65b789803986f165254);
+            marker_20d24a60eb5e5b07fe9889b8e2046e4a.setIcon(icon_6e3685dcec7580f73ecbf25177d962df);
         
     
-            marker_5502e6f5b205ae402f10351ddcbf6c09.bindTooltip(
+            marker_20d24a60eb5e5b07fe9889b8e2046e4a.bindTooltip(
                 `<div>
                      <span data-bid="361975161" data-bname="Building 361975161">Building 361975161</span>
                  </div>`,
@@ -1630,19 +1657,19 @@ function showPathOnMap(buildingId, pathIndex) {
             );
         
     
-            var marker_f5d26948c9217fbaa3ef66c52b32b660 = L.marker(
+            var marker_4aec673e4f1a40edfbce151076cd349d = L.marker(
                 [31.2670495, 34.8014017],
                 {}
-            ).addTo(map_9bbac5976436722e6b84a5cb33dda288);
+            ).addTo(map_d9707c4db0f907381814424872f25027);
         
     
-            var icon_8b0393a58f2a76fd1323c2af0afbbcf6 = L.AwesomeMarkers.icon(
+            var icon_9399a28c0549d00edaac236026960ab5 = L.AwesomeMarkers.icon(
                 {"extraClasses": "fa-rotate-0", "icon": "home", "iconColor": "white", "markerColor": "blue", "prefix": "fa"}
             );
-            marker_f5d26948c9217fbaa3ef66c52b32b660.setIcon(icon_8b0393a58f2a76fd1323c2af0afbbcf6);
+            marker_4aec673e4f1a40edfbce151076cd349d.setIcon(icon_9399a28c0549d00edaac236026960ab5);
         
     
-            marker_f5d26948c9217fbaa3ef66c52b32b660.bindTooltip(
+            marker_4aec673e4f1a40edfbce151076cd349d.bindTooltip(
                 `<div>
                      <span data-bid="361975164" data-bname="Building 361975164">Building 361975164</span>
                  </div>`,
@@ -1650,19 +1677,19 @@ function showPathOnMap(buildingId, pathIndex) {
             );
         
     
-            var marker_bc6a41696c75125143a9091bd810f2bc = L.marker(
+            var marker_c70ad45e50ca0fa668754d2ff4f63725 = L.marker(
                 [31.2676111, 34.8016832],
                 {}
-            ).addTo(map_9bbac5976436722e6b84a5cb33dda288);
+            ).addTo(map_d9707c4db0f907381814424872f25027);
         
     
-            var icon_cb05f790fb678fb299acc9f65abf5009 = L.AwesomeMarkers.icon(
+            var icon_d0f6b2ac53f6e18ccd293747f2596de8 = L.AwesomeMarkers.icon(
                 {"extraClasses": "fa-rotate-0", "icon": "home", "iconColor": "white", "markerColor": "blue", "prefix": "fa"}
             );
-            marker_bc6a41696c75125143a9091bd810f2bc.setIcon(icon_cb05f790fb678fb299acc9f65abf5009);
+            marker_c70ad45e50ca0fa668754d2ff4f63725.setIcon(icon_d0f6b2ac53f6e18ccd293747f2596de8);
         
     
-            marker_bc6a41696c75125143a9091bd810f2bc.bindTooltip(
+            marker_c70ad45e50ca0fa668754d2ff4f63725.bindTooltip(
                 `<div>
                      <span data-bid="361975167" data-bname="Building 361975167">Building 361975167</span>
                  </div>`,
@@ -1670,19 +1697,19 @@ function showPathOnMap(buildingId, pathIndex) {
             );
         
     
-            var marker_3e962b39d77e41e4572405052a7604d7 = L.marker(
+            var marker_7be0cb07eaec748d7bcaa4da7fb3fc60 = L.marker(
                 [31.2679183, 34.8015222],
                 {}
-            ).addTo(map_9bbac5976436722e6b84a5cb33dda288);
+            ).addTo(map_d9707c4db0f907381814424872f25027);
         
     
-            var icon_745c8a4cabbba261b7f4d65fac7b789c = L.AwesomeMarkers.icon(
+            var icon_00324b7e6ceb9daef3744934e199ca92 = L.AwesomeMarkers.icon(
                 {"extraClasses": "fa-rotate-0", "icon": "home", "iconColor": "white", "markerColor": "blue", "prefix": "fa"}
             );
-            marker_3e962b39d77e41e4572405052a7604d7.setIcon(icon_745c8a4cabbba261b7f4d65fac7b789c);
+            marker_7be0cb07eaec748d7bcaa4da7fb3fc60.setIcon(icon_00324b7e6ceb9daef3744934e199ca92);
         
     
-            marker_3e962b39d77e41e4572405052a7604d7.bindTooltip(
+            marker_7be0cb07eaec748d7bcaa4da7fb3fc60.bindTooltip(
                 `<div>
                      <span data-bid="361975170" data-bname="Building 361975170">Building 361975170</span>
                  </div>`,
@@ -1690,19 +1717,19 @@ function showPathOnMap(buildingId, pathIndex) {
             );
         
     
-            var marker_4b155c7eba4c16d9ae62976f4dc1bad8 = L.marker(
+            var marker_2d1c1771432afa1d232b4ec3fe2eb7e0 = L.marker(
                 [31.2655496, 34.7983957],
                 {}
-            ).addTo(map_9bbac5976436722e6b84a5cb33dda288);
+            ).addTo(map_d9707c4db0f907381814424872f25027);
         
     
-            var icon_cd51d534839e5269c3894b0a30d86324 = L.AwesomeMarkers.icon(
+            var icon_133ed27aeaeddc7ae0d46ae6f91c9687 = L.AwesomeMarkers.icon(
                 {"extraClasses": "fa-rotate-0", "icon": "home", "iconColor": "white", "markerColor": "blue", "prefix": "fa"}
             );
-            marker_4b155c7eba4c16d9ae62976f4dc1bad8.setIcon(icon_cd51d534839e5269c3894b0a30d86324);
+            marker_2d1c1771432afa1d232b4ec3fe2eb7e0.setIcon(icon_133ed27aeaeddc7ae0d46ae6f91c9687);
         
     
-            marker_4b155c7eba4c16d9ae62976f4dc1bad8.bindTooltip(
+            marker_2d1c1771432afa1d232b4ec3fe2eb7e0.bindTooltip(
                 `<div>
                      <span data-bid="361975757" data-bname="Building 361975757">Building 361975757</span>
                  </div>`,
@@ -1710,19 +1737,19 @@ function showPathOnMap(buildingId, pathIndex) {
             );
         
     
-            var marker_cdce87a8307af29f20ac14f733135ce5 = L.marker(
+            var marker_7bc0aff12ccab9d9d2c01ab1c65d97d7 = L.marker(
                 [31.2659484, 34.7987095],
                 {}
-            ).addTo(map_9bbac5976436722e6b84a5cb33dda288);
+            ).addTo(map_d9707c4db0f907381814424872f25027);
         
     
-            var icon_c0941dd1a94bb41517699fac420c00a0 = L.AwesomeMarkers.icon(
+            var icon_572324aed0baf75bee4479a00cc9c1f8 = L.AwesomeMarkers.icon(
                 {"extraClasses": "fa-rotate-0", "icon": "home", "iconColor": "white", "markerColor": "blue", "prefix": "fa"}
             );
-            marker_cdce87a8307af29f20ac14f733135ce5.setIcon(icon_c0941dd1a94bb41517699fac420c00a0);
+            marker_7bc0aff12ccab9d9d2c01ab1c65d97d7.setIcon(icon_572324aed0baf75bee4479a00cc9c1f8);
         
     
-            marker_cdce87a8307af29f20ac14f733135ce5.bindTooltip(
+            marker_7bc0aff12ccab9d9d2c01ab1c65d97d7.bindTooltip(
                 `<div>
                      <span data-bid="361975758" data-bname="Building 361975758">Building 361975758</span>
                  </div>`,
@@ -1730,19 +1757,19 @@ function showPathOnMap(buildingId, pathIndex) {
             );
         
     
-            var marker_ec0ec3156bfce6a299eec3eb2ca26f11 = L.marker(
+            var marker_cc65879ea87d0dd99e0e2afc9ef3f43a = L.marker(
                 [31.2660708, 34.8015621],
                 {}
-            ).addTo(map_9bbac5976436722e6b84a5cb33dda288);
+            ).addTo(map_d9707c4db0f907381814424872f25027);
         
     
-            var icon_72cc66b4f9f1e265fbde1043bf4c153f = L.AwesomeMarkers.icon(
+            var icon_30a2d67ff345eafc468900e03e061ced = L.AwesomeMarkers.icon(
                 {"extraClasses": "fa-rotate-0", "icon": "home", "iconColor": "white", "markerColor": "blue", "prefix": "fa"}
             );
-            marker_ec0ec3156bfce6a299eec3eb2ca26f11.setIcon(icon_72cc66b4f9f1e265fbde1043bf4c153f);
+            marker_cc65879ea87d0dd99e0e2afc9ef3f43a.setIcon(icon_30a2d67ff345eafc468900e03e061ced);
         
     
-            marker_ec0ec3156bfce6a299eec3eb2ca26f11.bindTooltip(
+            marker_cc65879ea87d0dd99e0e2afc9ef3f43a.bindTooltip(
                 `<div>
                      <span data-bid="361975764" data-bname="Building 361975764">Building 361975764</span>
                  </div>`,
@@ -1750,19 +1777,19 @@ function showPathOnMap(buildingId, pathIndex) {
             );
         
     
-            var marker_2a93c62618e38619a67c6253c23b7921 = L.marker(
+            var marker_a48e78af7bfeaa787e763a1f8bb63453 = L.marker(
                 [31.2659578, 34.7999892],
                 {}
-            ).addTo(map_9bbac5976436722e6b84a5cb33dda288);
+            ).addTo(map_d9707c4db0f907381814424872f25027);
         
     
-            var icon_1fb5762df3bff60dbdbf0e8d5633f08e = L.AwesomeMarkers.icon(
+            var icon_835e3f7e1b3146766f92243a95b34265 = L.AwesomeMarkers.icon(
                 {"extraClasses": "fa-rotate-0", "icon": "home", "iconColor": "white", "markerColor": "blue", "prefix": "fa"}
             );
-            marker_2a93c62618e38619a67c6253c23b7921.setIcon(icon_1fb5762df3bff60dbdbf0e8d5633f08e);
+            marker_a48e78af7bfeaa787e763a1f8bb63453.setIcon(icon_835e3f7e1b3146766f92243a95b34265);
         
     
-            marker_2a93c62618e38619a67c6253c23b7921.bindTooltip(
+            marker_a48e78af7bfeaa787e763a1f8bb63453.bindTooltip(
                 `<div>
                      <span data-bid="361975766" data-bname="Building 361975766">Building 361975766</span>
                  </div>`,
@@ -1770,19 +1797,19 @@ function showPathOnMap(buildingId, pathIndex) {
             );
         
     
-            var marker_60795698af7d7ed72d37812b126f33e4 = L.marker(
+            var marker_c30221ecb0847b470cd70fb2b4fd8145 = L.marker(
                 [31.2662546, 34.8006788],
                 {}
-            ).addTo(map_9bbac5976436722e6b84a5cb33dda288);
+            ).addTo(map_d9707c4db0f907381814424872f25027);
         
     
-            var icon_e73f6f0cee2840259049f963543e5fed = L.AwesomeMarkers.icon(
+            var icon_e79375dcc68b69e36fc77a4be7fc5245 = L.AwesomeMarkers.icon(
                 {"extraClasses": "fa-rotate-0", "icon": "home", "iconColor": "white", "markerColor": "blue", "prefix": "fa"}
             );
-            marker_60795698af7d7ed72d37812b126f33e4.setIcon(icon_e73f6f0cee2840259049f963543e5fed);
+            marker_c30221ecb0847b470cd70fb2b4fd8145.setIcon(icon_e79375dcc68b69e36fc77a4be7fc5245);
         
     
-            marker_60795698af7d7ed72d37812b126f33e4.bindTooltip(
+            marker_c30221ecb0847b470cd70fb2b4fd8145.bindTooltip(
                 `<div>
                      <span data-bid="361976593" data-bname="Building 361976593">Building 361976593</span>
                  </div>`,
@@ -1790,19 +1817,19 @@ function showPathOnMap(buildingId, pathIndex) {
             );
         
     
-            var marker_79eae1d5de6db0840a3ad88aa00c7ba0 = L.marker(
+            var marker_ea0a2f208c8da8ab441727ff6e5793e2 = L.marker(
                 [31.2664088, 34.8008611],
                 {}
-            ).addTo(map_9bbac5976436722e6b84a5cb33dda288);
+            ).addTo(map_d9707c4db0f907381814424872f25027);
         
     
-            var icon_ec7589c084fd367fb707747b55b8cb13 = L.AwesomeMarkers.icon(
+            var icon_96eff6ff4c7b947ddc0a5d6bc98d9b6c = L.AwesomeMarkers.icon(
                 {"extraClasses": "fa-rotate-0", "icon": "home", "iconColor": "white", "markerColor": "blue", "prefix": "fa"}
             );
-            marker_79eae1d5de6db0840a3ad88aa00c7ba0.setIcon(icon_ec7589c084fd367fb707747b55b8cb13);
+            marker_ea0a2f208c8da8ab441727ff6e5793e2.setIcon(icon_96eff6ff4c7b947ddc0a5d6bc98d9b6c);
         
     
-            marker_79eae1d5de6db0840a3ad88aa00c7ba0.bindTooltip(
+            marker_ea0a2f208c8da8ab441727ff6e5793e2.bindTooltip(
                 `<div>
                      <span data-bid="361976596" data-bname="Building 361976596">Building 361976596</span>
                  </div>`,
@@ -1810,19 +1837,19 @@ function showPathOnMap(buildingId, pathIndex) {
             );
         
     
-            var marker_37d515f35ec58f1e7db2df1772f13900 = L.marker(
+            var marker_53255f2f932572d66976f17917400505 = L.marker(
                 [31.2666069, 34.8010985],
                 {}
-            ).addTo(map_9bbac5976436722e6b84a5cb33dda288);
+            ).addTo(map_d9707c4db0f907381814424872f25027);
         
     
-            var icon_245713b6f728f3f7a02f134e06cf45f7 = L.AwesomeMarkers.icon(
+            var icon_ac341088d3fc6d5d65745463af412ff1 = L.AwesomeMarkers.icon(
                 {"extraClasses": "fa-rotate-0", "icon": "home", "iconColor": "white", "markerColor": "blue", "prefix": "fa"}
             );
-            marker_37d515f35ec58f1e7db2df1772f13900.setIcon(icon_245713b6f728f3f7a02f134e06cf45f7);
+            marker_53255f2f932572d66976f17917400505.setIcon(icon_ac341088d3fc6d5d65745463af412ff1);
         
     
-            marker_37d515f35ec58f1e7db2df1772f13900.bindTooltip(
+            marker_53255f2f932572d66976f17917400505.bindTooltip(
                 `<div>
                      <span data-bid="361976598" data-bname="Building 361976598">Building 361976598</span>
                  </div>`,
@@ -1830,19 +1857,19 @@ function showPathOnMap(buildingId, pathIndex) {
             );
         
     
-            var marker_b79f5fa9482e4c3fc3cfe8ee189ca477 = L.marker(
+            var marker_84d7384b0a4bbd4d15601b450581a37d = L.marker(
                 [31.2665733, 34.8006582],
                 {}
-            ).addTo(map_9bbac5976436722e6b84a5cb33dda288);
+            ).addTo(map_d9707c4db0f907381814424872f25027);
         
     
-            var icon_08ace8d050d8e86ca4318e7ac67b1474 = L.AwesomeMarkers.icon(
+            var icon_9159be259d9a6dbe1176db76008cdd50 = L.AwesomeMarkers.icon(
                 {"extraClasses": "fa-rotate-0", "icon": "home", "iconColor": "white", "markerColor": "blue", "prefix": "fa"}
             );
-            marker_b79f5fa9482e4c3fc3cfe8ee189ca477.setIcon(icon_08ace8d050d8e86ca4318e7ac67b1474);
+            marker_84d7384b0a4bbd4d15601b450581a37d.setIcon(icon_9159be259d9a6dbe1176db76008cdd50);
         
     
-            marker_b79f5fa9482e4c3fc3cfe8ee189ca477.bindTooltip(
+            marker_84d7384b0a4bbd4d15601b450581a37d.bindTooltip(
                 `<div>
                      <span data-bid="361976601" data-bname="Building 361976601">Building 361976601</span>
                  </div>`,
@@ -1850,19 +1877,19 @@ function showPathOnMap(buildingId, pathIndex) {
             );
         
     
-            var marker_2b97e3264eb744a9ed187deee8e4fd90 = L.marker(
+            var marker_61156ff3d4942a2e173d657b2a61784f = L.marker(
                 [31.266318, 34.8011092],
                 {}
-            ).addTo(map_9bbac5976436722e6b84a5cb33dda288);
+            ).addTo(map_d9707c4db0f907381814424872f25027);
         
     
-            var icon_bb42bf6f789a98bd21014fbd8b330253 = L.AwesomeMarkers.icon(
+            var icon_821d892a2a60d7a53fc6148ae9dca44c = L.AwesomeMarkers.icon(
                 {"extraClasses": "fa-rotate-0", "icon": "home", "iconColor": "white", "markerColor": "blue", "prefix": "fa"}
             );
-            marker_2b97e3264eb744a9ed187deee8e4fd90.setIcon(icon_bb42bf6f789a98bd21014fbd8b330253);
+            marker_61156ff3d4942a2e173d657b2a61784f.setIcon(icon_821d892a2a60d7a53fc6148ae9dca44c);
         
     
-            marker_2b97e3264eb744a9ed187deee8e4fd90.bindTooltip(
+            marker_61156ff3d4942a2e173d657b2a61784f.bindTooltip(
                 `<div>
                      <span data-bid="361976610" data-bname="Building 361976610">Building 361976610</span>
                  </div>`,
@@ -1870,19 +1897,19 @@ function showPathOnMap(buildingId, pathIndex) {
             );
         
     
-            var marker_a7256f1d1525f22e0d83dcd4de0b1c65 = L.marker(
+            var marker_c25b93e147d8d85cba1a69f60cde004d = L.marker(
                 [31.265716, 34.8008811],
                 {}
-            ).addTo(map_9bbac5976436722e6b84a5cb33dda288);
+            ).addTo(map_d9707c4db0f907381814424872f25027);
         
     
-            var icon_27d73859db656865d2bf53d9d353437d = L.AwesomeMarkers.icon(
+            var icon_3962a014fb473521472675bc1d3400e5 = L.AwesomeMarkers.icon(
                 {"extraClasses": "fa-rotate-0", "icon": "home", "iconColor": "white", "markerColor": "blue", "prefix": "fa"}
             );
-            marker_a7256f1d1525f22e0d83dcd4de0b1c65.setIcon(icon_27d73859db656865d2bf53d9d353437d);
+            marker_c25b93e147d8d85cba1a69f60cde004d.setIcon(icon_3962a014fb473521472675bc1d3400e5);
         
     
-            marker_a7256f1d1525f22e0d83dcd4de0b1c65.bindTooltip(
+            marker_c25b93e147d8d85cba1a69f60cde004d.bindTooltip(
                 `<div>
                      <span data-bid="361976613" data-bname="Building 361976613">Building 361976613</span>
                  </div>`,
@@ -1890,19 +1917,19 @@ function showPathOnMap(buildingId, pathIndex) {
             );
         
     
-            var marker_e3c6790916e3412798ea11653d6a8b70 = L.marker(
+            var marker_b6d4a4dd885a2129fc25fdca04cb4afd = L.marker(
                 [31.2653274, 34.8011706],
                 {}
-            ).addTo(map_9bbac5976436722e6b84a5cb33dda288);
+            ).addTo(map_d9707c4db0f907381814424872f25027);
         
     
-            var icon_000ecf14b0c7b8baedb348fb2d81ec07 = L.AwesomeMarkers.icon(
+            var icon_48e241737827b07d33a68350be19ddf7 = L.AwesomeMarkers.icon(
                 {"extraClasses": "fa-rotate-0", "icon": "home", "iconColor": "white", "markerColor": "blue", "prefix": "fa"}
             );
-            marker_e3c6790916e3412798ea11653d6a8b70.setIcon(icon_000ecf14b0c7b8baedb348fb2d81ec07);
+            marker_b6d4a4dd885a2129fc25fdca04cb4afd.setIcon(icon_48e241737827b07d33a68350be19ddf7);
         
     
-            marker_e3c6790916e3412798ea11653d6a8b70.bindTooltip(
+            marker_b6d4a4dd885a2129fc25fdca04cb4afd.bindTooltip(
                 `<div>
                      <span data-bid="361976615" data-bname="Building 361976615">Building 361976615</span>
                  </div>`,
@@ -1910,19 +1937,19 @@ function showPathOnMap(buildingId, pathIndex) {
             );
         
     
-            var marker_ed99e5e98a3446d11a6ea590a035ff34 = L.marker(
+            var marker_87ebfb144c45574b2d7171038ea0cd89 = L.marker(
                 [31.2654162, 34.8008704],
                 {}
-            ).addTo(map_9bbac5976436722e6b84a5cb33dda288);
+            ).addTo(map_d9707c4db0f907381814424872f25027);
         
     
-            var icon_1c960fd8a7e3642ce20e380d2489688f = L.AwesomeMarkers.icon(
+            var icon_28ef6ac2eebbcca500f9def5b49f8966 = L.AwesomeMarkers.icon(
                 {"extraClasses": "fa-rotate-0", "icon": "home", "iconColor": "white", "markerColor": "blue", "prefix": "fa"}
             );
-            marker_ed99e5e98a3446d11a6ea590a035ff34.setIcon(icon_1c960fd8a7e3642ce20e380d2489688f);
+            marker_87ebfb144c45574b2d7171038ea0cd89.setIcon(icon_28ef6ac2eebbcca500f9def5b49f8966);
         
     
-            marker_ed99e5e98a3446d11a6ea590a035ff34.bindTooltip(
+            marker_87ebfb144c45574b2d7171038ea0cd89.bindTooltip(
                 `<div>
                      <span data-bid="361976616" data-bname="Building 361976616">Building 361976616</span>
                  </div>`,
@@ -1930,19 +1957,19 @@ function showPathOnMap(buildingId, pathIndex) {
             );
         
     
-            var marker_0b6621c171c99c230265fcbea5d43b72 = L.marker(
+            var marker_a5f09c43697f12cedd3a39ad27a874f8 = L.marker(
                 [31.2653317, 34.8003591],
                 {}
-            ).addTo(map_9bbac5976436722e6b84a5cb33dda288);
+            ).addTo(map_d9707c4db0f907381814424872f25027);
         
     
-            var icon_1231e7759b6f1d35dd23519067cebd63 = L.AwesomeMarkers.icon(
+            var icon_25f7591ff3671ee6e22e7264dd7b4ebb = L.AwesomeMarkers.icon(
                 {"extraClasses": "fa-rotate-0", "icon": "home", "iconColor": "white", "markerColor": "blue", "prefix": "fa"}
             );
-            marker_0b6621c171c99c230265fcbea5d43b72.setIcon(icon_1231e7759b6f1d35dd23519067cebd63);
+            marker_a5f09c43697f12cedd3a39ad27a874f8.setIcon(icon_25f7591ff3671ee6e22e7264dd7b4ebb);
         
     
-            marker_0b6621c171c99c230265fcbea5d43b72.bindTooltip(
+            marker_a5f09c43697f12cedd3a39ad27a874f8.bindTooltip(
                 `<div>
                      <span data-bid="361976953" data-bname="Building 361976953">Building 361976953</span>
                  </div>`,
@@ -1950,19 +1977,19 @@ function showPathOnMap(buildingId, pathIndex) {
             );
         
     
-            var marker_0020e6350205a9090378cd0f98780d95 = L.marker(
+            var marker_80a37a29a8510836af6b357f43e95d1a = L.marker(
                 [31.2652996, 34.799423],
                 {}
-            ).addTo(map_9bbac5976436722e6b84a5cb33dda288);
+            ).addTo(map_d9707c4db0f907381814424872f25027);
         
     
-            var icon_a363b8c651d90d4ee9f617c427898d28 = L.AwesomeMarkers.icon(
+            var icon_f26bd63010237cd88c02fb3d48a0ecf3 = L.AwesomeMarkers.icon(
                 {"extraClasses": "fa-rotate-0", "icon": "home", "iconColor": "white", "markerColor": "blue", "prefix": "fa"}
             );
-            marker_0020e6350205a9090378cd0f98780d95.setIcon(icon_a363b8c651d90d4ee9f617c427898d28);
+            marker_80a37a29a8510836af6b357f43e95d1a.setIcon(icon_f26bd63010237cd88c02fb3d48a0ecf3);
         
     
-            marker_0020e6350205a9090378cd0f98780d95.bindTooltip(
+            marker_80a37a29a8510836af6b357f43e95d1a.bindTooltip(
                 `<div>
                      <span data-bid="361976954" data-bname="Building 361976954">Building 361976954</span>
                  </div>`,
@@ -1970,19 +1997,19 @@ function showPathOnMap(buildingId, pathIndex) {
             );
         
     
-            var marker_a8733bceb27d0278fd6ff94d668637ef = L.marker(
+            var marker_8d3e91e5bf269a495f3e4327c7463d5e = L.marker(
                 [31.2654837, 34.7998565],
                 {}
-            ).addTo(map_9bbac5976436722e6b84a5cb33dda288);
+            ).addTo(map_d9707c4db0f907381814424872f25027);
         
     
-            var icon_feb5502d6ffe5cdfca9859d0b2da4bd9 = L.AwesomeMarkers.icon(
+            var icon_dd8cbcda4cf85696fb1b5ba9572db5ff = L.AwesomeMarkers.icon(
                 {"extraClasses": "fa-rotate-0", "icon": "home", "iconColor": "white", "markerColor": "blue", "prefix": "fa"}
             );
-            marker_a8733bceb27d0278fd6ff94d668637ef.setIcon(icon_feb5502d6ffe5cdfca9859d0b2da4bd9);
+            marker_8d3e91e5bf269a495f3e4327c7463d5e.setIcon(icon_dd8cbcda4cf85696fb1b5ba9572db5ff);
         
     
-            marker_a8733bceb27d0278fd6ff94d668637ef.bindTooltip(
+            marker_8d3e91e5bf269a495f3e4327c7463d5e.bindTooltip(
                 `<div>
                      <span data-bid="361976955" data-bname="Building 361976955">Building 361976955</span>
                  </div>`,
@@ -1990,19 +2017,19 @@ function showPathOnMap(buildingId, pathIndex) {
             );
         
     
-            var marker_00dc05cc0905969622a5834adf21d02b = L.marker(
+            var marker_3f60de16a999fe79de8f3dce00240b36 = L.marker(
                 [31.2654977, 34.8001611],
                 {}
-            ).addTo(map_9bbac5976436722e6b84a5cb33dda288);
+            ).addTo(map_d9707c4db0f907381814424872f25027);
         
     
-            var icon_e0b6cb8bf939f6364aced1dd1c6e68ba = L.AwesomeMarkers.icon(
+            var icon_d2144033ca4b939e40debc123a6429e7 = L.AwesomeMarkers.icon(
                 {"extraClasses": "fa-rotate-0", "icon": "home", "iconColor": "white", "markerColor": "blue", "prefix": "fa"}
             );
-            marker_00dc05cc0905969622a5834adf21d02b.setIcon(icon_e0b6cb8bf939f6364aced1dd1c6e68ba);
+            marker_3f60de16a999fe79de8f3dce00240b36.setIcon(icon_d2144033ca4b939e40debc123a6429e7);
         
     
-            marker_00dc05cc0905969622a5834adf21d02b.bindTooltip(
+            marker_3f60de16a999fe79de8f3dce00240b36.bindTooltip(
                 `<div>
                      <span data-bid="361976957" data-bname="Building 361976957">Building 361976957</span>
                  </div>`,
@@ -2010,19 +2037,19 @@ function showPathOnMap(buildingId, pathIndex) {
             );
         
     
-            var marker_1aac196b523a32fc956972c8be5313ab = L.marker(
+            var marker_47e2e7b0a161d46a6cac335e780702bc = L.marker(
                 [31.2656417, 34.7995576],
                 {}
-            ).addTo(map_9bbac5976436722e6b84a5cb33dda288);
+            ).addTo(map_d9707c4db0f907381814424872f25027);
         
     
-            var icon_ef0d584e216fc4268d3dd1aee885284a = L.AwesomeMarkers.icon(
+            var icon_93b8ffb7727ba888acf153893ac3145c = L.AwesomeMarkers.icon(
                 {"extraClasses": "fa-rotate-0", "icon": "home", "iconColor": "white", "markerColor": "blue", "prefix": "fa"}
             );
-            marker_1aac196b523a32fc956972c8be5313ab.setIcon(icon_ef0d584e216fc4268d3dd1aee885284a);
+            marker_47e2e7b0a161d46a6cac335e780702bc.setIcon(icon_93b8ffb7727ba888acf153893ac3145c);
         
     
-            marker_1aac196b523a32fc956972c8be5313ab.bindTooltip(
+            marker_47e2e7b0a161d46a6cac335e780702bc.bindTooltip(
                 `<div>
                      <span data-bid="361976958" data-bname="Building 361976958">Building 361976958</span>
                  </div>`,
@@ -2030,19 +2057,19 @@ function showPathOnMap(buildingId, pathIndex) {
             );
         
     
-            var marker_48a49b2e8e6f4a6b2296cf33afca09da = L.marker(
+            var marker_5a33cbb87d70e98fdfb62490386b5f8f = L.marker(
                 [31.2654784, 34.7994177],
                 {}
-            ).addTo(map_9bbac5976436722e6b84a5cb33dda288);
+            ).addTo(map_d9707c4db0f907381814424872f25027);
         
     
-            var icon_ec0edf2b63d815da7df9bdfb2c08e645 = L.AwesomeMarkers.icon(
+            var icon_0375f9329482e8166eb83fbddf05d36c = L.AwesomeMarkers.icon(
                 {"extraClasses": "fa-rotate-0", "icon": "home", "iconColor": "white", "markerColor": "blue", "prefix": "fa"}
             );
-            marker_48a49b2e8e6f4a6b2296cf33afca09da.setIcon(icon_ec0edf2b63d815da7df9bdfb2c08e645);
+            marker_5a33cbb87d70e98fdfb62490386b5f8f.setIcon(icon_0375f9329482e8166eb83fbddf05d36c);
         
     
-            marker_48a49b2e8e6f4a6b2296cf33afca09da.bindTooltip(
+            marker_5a33cbb87d70e98fdfb62490386b5f8f.bindTooltip(
                 `<div>
                      <span data-bid="361976959" data-bname="Building 361976959">Building 361976959</span>
                  </div>`,
@@ -2050,19 +2077,19 @@ function showPathOnMap(buildingId, pathIndex) {
             );
         
     
-            var marker_eb9b11993a8d21ad3eb3b760af195779 = L.marker(
+            var marker_094ba1d7d1c6fccbf62aab0c6133f25f = L.marker(
                 [31.2652825, 34.799864],
                 {}
-            ).addTo(map_9bbac5976436722e6b84a5cb33dda288);
+            ).addTo(map_d9707c4db0f907381814424872f25027);
         
     
-            var icon_cf2691909fbe3a07117a798a8c81f7ed = L.AwesomeMarkers.icon(
+            var icon_672cf5841b9b7619994c23070df6caf0 = L.AwesomeMarkers.icon(
                 {"extraClasses": "fa-rotate-0", "icon": "home", "iconColor": "white", "markerColor": "blue", "prefix": "fa"}
             );
-            marker_eb9b11993a8d21ad3eb3b760af195779.setIcon(icon_cf2691909fbe3a07117a798a8c81f7ed);
+            marker_094ba1d7d1c6fccbf62aab0c6133f25f.setIcon(icon_672cf5841b9b7619994c23070df6caf0);
         
     
-            marker_eb9b11993a8d21ad3eb3b760af195779.bindTooltip(
+            marker_094ba1d7d1c6fccbf62aab0c6133f25f.bindTooltip(
                 `<div>
                      <span data-bid="361976962" data-bname="Building 361976962">Building 361976962</span>
                  </div>`,
@@ -2070,19 +2097,19 @@ function showPathOnMap(buildingId, pathIndex) {
             );
         
     
-            var marker_f6f885145282261722c8fb5ffc27b4b4 = L.marker(
+            var marker_39a3017e65e4b1668391b5f12c1b4158 = L.marker(
                 [31.2656953, 34.8002586],
                 {}
-            ).addTo(map_9bbac5976436722e6b84a5cb33dda288);
+            ).addTo(map_d9707c4db0f907381814424872f25027);
         
     
-            var icon_8b96ea4dbc698f483a293a5018414d08 = L.AwesomeMarkers.icon(
+            var icon_2352380a7f273d7cdd1f894f4528b6e1 = L.AwesomeMarkers.icon(
                 {"extraClasses": "fa-rotate-0", "icon": "home", "iconColor": "white", "markerColor": "blue", "prefix": "fa"}
             );
-            marker_f6f885145282261722c8fb5ffc27b4b4.setIcon(icon_8b96ea4dbc698f483a293a5018414d08);
+            marker_39a3017e65e4b1668391b5f12c1b4158.setIcon(icon_2352380a7f273d7cdd1f894f4528b6e1);
         
     
-            marker_f6f885145282261722c8fb5ffc27b4b4.bindTooltip(
+            marker_39a3017e65e4b1668391b5f12c1b4158.bindTooltip(
                 `<div>
                      <span data-bid="361976963" data-bname="Building 361976963">Building 361976963</span>
                  </div>`,
@@ -2090,19 +2117,19 @@ function showPathOnMap(buildingId, pathIndex) {
             );
         
     
-            var marker_5bbd06e3b3679b0a2a25322312a80f51 = L.marker(
+            var marker_b83b71edebbdb7b8662c50d2f5bb7ec6 = L.marker(
                 [31.2655182, 34.8004732],
                 {}
-            ).addTo(map_9bbac5976436722e6b84a5cb33dda288);
+            ).addTo(map_d9707c4db0f907381814424872f25027);
         
     
-            var icon_65b4a8fd65639752d7941edf61c1391d = L.AwesomeMarkers.icon(
+            var icon_26f5a0bf56bf39223b9a35c0b9f217a1 = L.AwesomeMarkers.icon(
                 {"extraClasses": "fa-rotate-0", "icon": "home", "iconColor": "white", "markerColor": "blue", "prefix": "fa"}
             );
-            marker_5bbd06e3b3679b0a2a25322312a80f51.setIcon(icon_65b4a8fd65639752d7941edf61c1391d);
+            marker_b83b71edebbdb7b8662c50d2f5bb7ec6.setIcon(icon_26f5a0bf56bf39223b9a35c0b9f217a1);
         
     
-            marker_5bbd06e3b3679b0a2a25322312a80f51.bindTooltip(
+            marker_b83b71edebbdb7b8662c50d2f5bb7ec6.bindTooltip(
                 `<div>
                      <span data-bid="361976965" data-bname="Building 361976965">Building 361976965</span>
                  </div>`,
@@ -2110,19 +2137,19 @@ function showPathOnMap(buildingId, pathIndex) {
             );
         
     
-            var marker_92ba5c59b8253439e094cb130492eeb8 = L.marker(
+            var marker_111e184198030a406d27726a156084bb = L.marker(
                 [31.2653398, 34.7989467],
                 {}
-            ).addTo(map_9bbac5976436722e6b84a5cb33dda288);
+            ).addTo(map_d9707c4db0f907381814424872f25027);
         
     
-            var icon_bf27dff421e4e52d2b227180a108a46b = L.AwesomeMarkers.icon(
+            var icon_1ddb15cd9ac46875c96b07cbc7f63847 = L.AwesomeMarkers.icon(
                 {"extraClasses": "fa-rotate-0", "icon": "home", "iconColor": "white", "markerColor": "blue", "prefix": "fa"}
             );
-            marker_92ba5c59b8253439e094cb130492eeb8.setIcon(icon_bf27dff421e4e52d2b227180a108a46b);
+            marker_111e184198030a406d27726a156084bb.setIcon(icon_1ddb15cd9ac46875c96b07cbc7f63847);
         
     
-            marker_92ba5c59b8253439e094cb130492eeb8.bindTooltip(
+            marker_111e184198030a406d27726a156084bb.bindTooltip(
                 `<div>
                      <span data-bid="361977073" data-bname="Building 361977073">Building 361977073</span>
                  </div>`,
@@ -2130,19 +2157,19 @@ function showPathOnMap(buildingId, pathIndex) {
             );
         
     
-            var marker_c73f589897f0a9625e2e41c238c2cb9b = L.marker(
+            var marker_0fd2ca0262a79ad399884e32979053c7 = L.marker(
                 [31.2653246, 34.7985996],
                 {}
-            ).addTo(map_9bbac5976436722e6b84a5cb33dda288);
+            ).addTo(map_d9707c4db0f907381814424872f25027);
         
     
-            var icon_ac9a6a26a71f2bca79ca35d23a2941ae = L.AwesomeMarkers.icon(
+            var icon_c3f2228e8f3b792c2b8659cbb00e75b3 = L.AwesomeMarkers.icon(
                 {"extraClasses": "fa-rotate-0", "icon": "home", "iconColor": "white", "markerColor": "blue", "prefix": "fa"}
             );
-            marker_c73f589897f0a9625e2e41c238c2cb9b.setIcon(icon_ac9a6a26a71f2bca79ca35d23a2941ae);
+            marker_0fd2ca0262a79ad399884e32979053c7.setIcon(icon_c3f2228e8f3b792c2b8659cbb00e75b3);
         
     
-            marker_c73f589897f0a9625e2e41c238c2cb9b.bindTooltip(
+            marker_0fd2ca0262a79ad399884e32979053c7.bindTooltip(
                 `<div>
                      <span data-bid="361977074" data-bname="Building 361977074">Building 361977074</span>
                  </div>`,
@@ -2150,19 +2177,19 @@ function showPathOnMap(buildingId, pathIndex) {
             );
         
     
-            var marker_7037712173cbbc44887205ee4a0acb3f = L.marker(
+            var marker_891564dd9826189bb532c969aafc0478 = L.marker(
                 [31.2655249, 34.7986602],
                 {}
-            ).addTo(map_9bbac5976436722e6b84a5cb33dda288);
+            ).addTo(map_d9707c4db0f907381814424872f25027);
         
     
-            var icon_b36becf52f85a0d05a47faf02e0bea34 = L.AwesomeMarkers.icon(
+            var icon_d4437e90fbd90a7913b72f761b187ea8 = L.AwesomeMarkers.icon(
                 {"extraClasses": "fa-rotate-0", "icon": "home", "iconColor": "white", "markerColor": "blue", "prefix": "fa"}
             );
-            marker_7037712173cbbc44887205ee4a0acb3f.setIcon(icon_b36becf52f85a0d05a47faf02e0bea34);
+            marker_891564dd9826189bb532c969aafc0478.setIcon(icon_d4437e90fbd90a7913b72f761b187ea8);
         
     
-            marker_7037712173cbbc44887205ee4a0acb3f.bindTooltip(
+            marker_891564dd9826189bb532c969aafc0478.bindTooltip(
                 `<div>
                      <span data-bid="361977075" data-bname="Building 361977075">Building 361977075</span>
                  </div>`,
@@ -2170,19 +2197,19 @@ function showPathOnMap(buildingId, pathIndex) {
             );
         
     
-            var marker_90627a7e59e17572c8b419512ca113e8 = L.marker(
+            var marker_8439217359aa8df4ce0b0cad52ff1907 = L.marker(
                 [31.2655387, 34.7990197],
                 {}
-            ).addTo(map_9bbac5976436722e6b84a5cb33dda288);
+            ).addTo(map_d9707c4db0f907381814424872f25027);
         
     
-            var icon_ccc5b4c199f10962e1698f22575c5693 = L.AwesomeMarkers.icon(
+            var icon_7ed2b6ea6a23fcaec98c310a1aebc3a0 = L.AwesomeMarkers.icon(
                 {"extraClasses": "fa-rotate-0", "icon": "home", "iconColor": "white", "markerColor": "blue", "prefix": "fa"}
             );
-            marker_90627a7e59e17572c8b419512ca113e8.setIcon(icon_ccc5b4c199f10962e1698f22575c5693);
+            marker_8439217359aa8df4ce0b0cad52ff1907.setIcon(icon_7ed2b6ea6a23fcaec98c310a1aebc3a0);
         
     
-            marker_90627a7e59e17572c8b419512ca113e8.bindTooltip(
+            marker_8439217359aa8df4ce0b0cad52ff1907.bindTooltip(
                 `<div>
                      <span data-bid="361977076" data-bname="Building 361977076">Building 361977076</span>
                  </div>`,
@@ -2190,19 +2217,19 @@ function showPathOnMap(buildingId, pathIndex) {
             );
         
     
-            var marker_cb173775ea3e41584d7a74ed8ac00edd = L.marker(
+            var marker_37f0ffa95667d4e35fcfde172fb5575f = L.marker(
                 [31.2657206, 34.7988508],
                 {}
-            ).addTo(map_9bbac5976436722e6b84a5cb33dda288);
+            ).addTo(map_d9707c4db0f907381814424872f25027);
         
     
-            var icon_fb3342cb1bd7dd16ef8731a6e573f4cf = L.AwesomeMarkers.icon(
+            var icon_058b578d17f557daa02096cf9965c405 = L.AwesomeMarkers.icon(
                 {"extraClasses": "fa-rotate-0", "icon": "home", "iconColor": "white", "markerColor": "blue", "prefix": "fa"}
             );
-            marker_cb173775ea3e41584d7a74ed8ac00edd.setIcon(icon_fb3342cb1bd7dd16ef8731a6e573f4cf);
+            marker_37f0ffa95667d4e35fcfde172fb5575f.setIcon(icon_058b578d17f557daa02096cf9965c405);
         
     
-            marker_cb173775ea3e41584d7a74ed8ac00edd.bindTooltip(
+            marker_37f0ffa95667d4e35fcfde172fb5575f.bindTooltip(
                 `<div>
                      <span data-bid="361977077" data-bname="Building 361977077">Building 361977077</span>
                  </div>`,
@@ -2210,19 +2237,19 @@ function showPathOnMap(buildingId, pathIndex) {
             );
         
     
-            var marker_fdd3c3965a37cbe8419377dca34a50a0 = L.marker(
+            var marker_bbff90ce7c85efbd142f0b917c6455d4 = L.marker(
                 [31.2660207, 34.8019398],
                 {}
-            ).addTo(map_9bbac5976436722e6b84a5cb33dda288);
+            ).addTo(map_d9707c4db0f907381814424872f25027);
         
     
-            var icon_0f279e0cf90ef383c7ac89fda5c6407e = L.AwesomeMarkers.icon(
+            var icon_902ecf3ed3e8db27a332dd4aa8c2a9f3 = L.AwesomeMarkers.icon(
                 {"extraClasses": "fa-rotate-0", "icon": "home", "iconColor": "white", "markerColor": "blue", "prefix": "fa"}
             );
-            marker_fdd3c3965a37cbe8419377dca34a50a0.setIcon(icon_0f279e0cf90ef383c7ac89fda5c6407e);
+            marker_bbff90ce7c85efbd142f0b917c6455d4.setIcon(icon_902ecf3ed3e8db27a332dd4aa8c2a9f3);
         
     
-            marker_fdd3c3965a37cbe8419377dca34a50a0.bindTooltip(
+            marker_bbff90ce7c85efbd142f0b917c6455d4.bindTooltip(
                 `<div>
                      <span data-bid="361978364" data-bname="Building 361978364">Building 361978364</span>
                  </div>`,
@@ -2230,19 +2257,19 @@ function showPathOnMap(buildingId, pathIndex) {
             );
         
     
-            var marker_6e63de01206e8a760ea11052c4e5560a = L.marker(
+            var marker_b39eaf01cef15315145853d0cbb99df5 = L.marker(
                 [31.2670742, 34.8020597],
                 {}
-            ).addTo(map_9bbac5976436722e6b84a5cb33dda288);
+            ).addTo(map_d9707c4db0f907381814424872f25027);
         
     
-            var icon_41f720aa9a2980b23a8c8b1f4325fc21 = L.AwesomeMarkers.icon(
+            var icon_754a74215444d45a432f4a0bb158790b = L.AwesomeMarkers.icon(
                 {"extraClasses": "fa-rotate-0", "icon": "home", "iconColor": "white", "markerColor": "blue", "prefix": "fa"}
             );
-            marker_6e63de01206e8a760ea11052c4e5560a.setIcon(icon_41f720aa9a2980b23a8c8b1f4325fc21);
+            marker_b39eaf01cef15315145853d0cbb99df5.setIcon(icon_754a74215444d45a432f4a0bb158790b);
         
     
-            marker_6e63de01206e8a760ea11052c4e5560a.bindTooltip(
+            marker_b39eaf01cef15315145853d0cbb99df5.bindTooltip(
                 `<div>
                      <span data-bid="361978365" data-bname="Building 361978365">Building 361978365</span>
                  </div>`,
@@ -2250,19 +2277,19 @@ function showPathOnMap(buildingId, pathIndex) {
             );
         
     
-            var marker_1199062c3b4a6f420af98ec9cd920eed = L.marker(
+            var marker_c62f968f7fc165430683458ea351d106 = L.marker(
                 [31.2667433, 34.801889],
                 {}
-            ).addTo(map_9bbac5976436722e6b84a5cb33dda288);
+            ).addTo(map_d9707c4db0f907381814424872f25027);
         
     
-            var icon_9a57269af63b2f4b0d5ddf2e5203d94d = L.AwesomeMarkers.icon(
+            var icon_bf213b7258e7c22943f784d1d8e4e73b = L.AwesomeMarkers.icon(
                 {"extraClasses": "fa-rotate-0", "icon": "home", "iconColor": "white", "markerColor": "blue", "prefix": "fa"}
             );
-            marker_1199062c3b4a6f420af98ec9cd920eed.setIcon(icon_9a57269af63b2f4b0d5ddf2e5203d94d);
+            marker_c62f968f7fc165430683458ea351d106.setIcon(icon_bf213b7258e7c22943f784d1d8e4e73b);
         
     
-            marker_1199062c3b4a6f420af98ec9cd920eed.bindTooltip(
+            marker_c62f968f7fc165430683458ea351d106.bindTooltip(
                 `<div>
                      <span data-bid="361978366" data-bname="Building 361978366">Building 361978366</span>
                  </div>`,
@@ -2270,19 +2297,19 @@ function showPathOnMap(buildingId, pathIndex) {
             );
         
     
-            var marker_70fec379d412738ef24a2aa5243baab6 = L.marker(
+            var marker_794ca7e91af28f4df495f41c3b9775b4 = L.marker(
                 [31.2663334, 34.8019245],
                 {}
-            ).addTo(map_9bbac5976436722e6b84a5cb33dda288);
+            ).addTo(map_d9707c4db0f907381814424872f25027);
         
     
-            var icon_e1de72a7c56ffe3d81db2b2e6e230a42 = L.AwesomeMarkers.icon(
+            var icon_3db982b6f3bbc458912851c4390444a9 = L.AwesomeMarkers.icon(
                 {"extraClasses": "fa-rotate-0", "icon": "home", "iconColor": "white", "markerColor": "blue", "prefix": "fa"}
             );
-            marker_70fec379d412738ef24a2aa5243baab6.setIcon(icon_e1de72a7c56ffe3d81db2b2e6e230a42);
+            marker_794ca7e91af28f4df495f41c3b9775b4.setIcon(icon_3db982b6f3bbc458912851c4390444a9);
         
     
-            marker_70fec379d412738ef24a2aa5243baab6.bindTooltip(
+            marker_794ca7e91af28f4df495f41c3b9775b4.bindTooltip(
                 `<div>
                      <span data-bid="361978367" data-bname="Building 361978367">Building 361978367</span>
                  </div>`,
@@ -2290,19 +2317,19 @@ function showPathOnMap(buildingId, pathIndex) {
             );
         
     
-            var marker_8fbd9c219671bfb84df02bcedd832ee8 = L.marker(
+            var marker_b402ae1bb107a3ad6a93dfdc3104fef8 = L.marker(
                 [31.2657549, 34.8018992],
                 {}
-            ).addTo(map_9bbac5976436722e6b84a5cb33dda288);
+            ).addTo(map_d9707c4db0f907381814424872f25027);
         
     
-            var icon_4745094b832dd74ba229618290a7e092 = L.AwesomeMarkers.icon(
+            var icon_cee1f7ad81e5eb5a308beb494ba79cf7 = L.AwesomeMarkers.icon(
                 {"extraClasses": "fa-rotate-0", "icon": "home", "iconColor": "white", "markerColor": "blue", "prefix": "fa"}
             );
-            marker_8fbd9c219671bfb84df02bcedd832ee8.setIcon(icon_4745094b832dd74ba229618290a7e092);
+            marker_b402ae1bb107a3ad6a93dfdc3104fef8.setIcon(icon_cee1f7ad81e5eb5a308beb494ba79cf7);
         
     
-            marker_8fbd9c219671bfb84df02bcedd832ee8.bindTooltip(
+            marker_b402ae1bb107a3ad6a93dfdc3104fef8.bindTooltip(
                 `<div>
                      <span data-bid="361978369" data-bname="Building 361978369">Building 361978369</span>
                  </div>`,
@@ -2310,19 +2337,19 @@ function showPathOnMap(buildingId, pathIndex) {
             );
         
     
-            var marker_2677245df4da8a954a0b8bd4d9c7b3aa = L.marker(
+            var marker_afa5d1c127f904c7ef82491c438ff7b7 = L.marker(
                 [31.2661754, 34.8022687],
                 {}
-            ).addTo(map_9bbac5976436722e6b84a5cb33dda288);
+            ).addTo(map_d9707c4db0f907381814424872f25027);
         
     
-            var icon_364f36773ea852551447ae7ccd3a248f = L.AwesomeMarkers.icon(
+            var icon_afd43b7ab0d573a0cc1b1bdfd45f33c6 = L.AwesomeMarkers.icon(
                 {"extraClasses": "fa-rotate-0", "icon": "home", "iconColor": "white", "markerColor": "blue", "prefix": "fa"}
             );
-            marker_2677245df4da8a954a0b8bd4d9c7b3aa.setIcon(icon_364f36773ea852551447ae7ccd3a248f);
+            marker_afa5d1c127f904c7ef82491c438ff7b7.setIcon(icon_afd43b7ab0d573a0cc1b1bdfd45f33c6);
         
     
-            marker_2677245df4da8a954a0b8bd4d9c7b3aa.bindTooltip(
+            marker_afa5d1c127f904c7ef82491c438ff7b7.bindTooltip(
                 `<div>
                      <span data-bid="361978370" data-bname="Building 361978370">Building 361978370</span>
                  </div>`,
@@ -2330,19 +2357,19 @@ function showPathOnMap(buildingId, pathIndex) {
             );
         
     
-            var marker_894e946fe3ee1d9a354bd5718f3a5201 = L.marker(
+            var marker_9e61db2ea4a3d315b588a329753e8870 = L.marker(
                 [31.2656017, 34.8018993],
                 {}
-            ).addTo(map_9bbac5976436722e6b84a5cb33dda288);
+            ).addTo(map_d9707c4db0f907381814424872f25027);
         
     
-            var icon_9de30e1b2c0c6430a8bf601b670d5eb3 = L.AwesomeMarkers.icon(
+            var icon_c17d1591373d904dadd6cde6388f1d96 = L.AwesomeMarkers.icon(
                 {"extraClasses": "fa-rotate-0", "icon": "home", "iconColor": "white", "markerColor": "blue", "prefix": "fa"}
             );
-            marker_894e946fe3ee1d9a354bd5718f3a5201.setIcon(icon_9de30e1b2c0c6430a8bf601b670d5eb3);
+            marker_9e61db2ea4a3d315b588a329753e8870.setIcon(icon_c17d1591373d904dadd6cde6388f1d96);
         
     
-            marker_894e946fe3ee1d9a354bd5718f3a5201.bindTooltip(
+            marker_9e61db2ea4a3d315b588a329753e8870.bindTooltip(
                 `<div>
                      <span data-bid="361978371" data-bname="Building 361978371">Building 361978371</span>
                  </div>`,
@@ -2350,19 +2377,19 @@ function showPathOnMap(buildingId, pathIndex) {
             );
         
     
-            var marker_6906492bbc645ffbd12d1db325fa1adc = L.marker(
+            var marker_e39d8379d5d205d4c01cb20e5f2aea52 = L.marker(
                 [31.2655242, 34.8021614],
                 {}
-            ).addTo(map_9bbac5976436722e6b84a5cb33dda288);
+            ).addTo(map_d9707c4db0f907381814424872f25027);
         
     
-            var icon_9abd2439743637e978dbe4ad018193ba = L.AwesomeMarkers.icon(
+            var icon_002cf6cc55fe8eaa948c1301415fa422 = L.AwesomeMarkers.icon(
                 {"extraClasses": "fa-rotate-0", "icon": "home", "iconColor": "white", "markerColor": "blue", "prefix": "fa"}
             );
-            marker_6906492bbc645ffbd12d1db325fa1adc.setIcon(icon_9abd2439743637e978dbe4ad018193ba);
+            marker_e39d8379d5d205d4c01cb20e5f2aea52.setIcon(icon_002cf6cc55fe8eaa948c1301415fa422);
         
     
-            marker_6906492bbc645ffbd12d1db325fa1adc.bindTooltip(
+            marker_e39d8379d5d205d4c01cb20e5f2aea52.bindTooltip(
                 `<div>
                      <span data-bid="361978372" data-bname="Building 361978372">Building 361978372</span>
                  </div>`,
@@ -2370,19 +2397,19 @@ function showPathOnMap(buildingId, pathIndex) {
             );
         
     
-            var marker_e69b50287dddfb0215c8fd852bc3e42f = L.marker(
+            var marker_0709eb923827924043f0f27b17e50a8f = L.marker(
                 [31.2657456, 34.8021682],
                 {}
-            ).addTo(map_9bbac5976436722e6b84a5cb33dda288);
+            ).addTo(map_d9707c4db0f907381814424872f25027);
         
     
-            var icon_6f5202aaffe4814a0910a2d5e27785d5 = L.AwesomeMarkers.icon(
+            var icon_1c1236d11a483b8097893a76009123da = L.AwesomeMarkers.icon(
                 {"extraClasses": "fa-rotate-0", "icon": "home", "iconColor": "white", "markerColor": "blue", "prefix": "fa"}
             );
-            marker_e69b50287dddfb0215c8fd852bc3e42f.setIcon(icon_6f5202aaffe4814a0910a2d5e27785d5);
+            marker_0709eb923827924043f0f27b17e50a8f.setIcon(icon_1c1236d11a483b8097893a76009123da);
         
     
-            marker_e69b50287dddfb0215c8fd852bc3e42f.bindTooltip(
+            marker_0709eb923827924043f0f27b17e50a8f.bindTooltip(
                 `<div>
                      <span data-bid="361978374" data-bname="Building 361978374">Building 361978374</span>
                  </div>`,
@@ -2390,19 +2417,19 @@ function showPathOnMap(buildingId, pathIndex) {
             );
         
     
-            var marker_3ce629614ed658baf8bc8436a3bda04d = L.marker(
+            var marker_2615e566505f9cc4c4303ba3ff88d986 = L.marker(
                 [31.2658253, 34.8029111],
                 {}
-            ).addTo(map_9bbac5976436722e6b84a5cb33dda288);
+            ).addTo(map_d9707c4db0f907381814424872f25027);
         
     
-            var icon_e87a917e165891ad08dc351c68f34519 = L.AwesomeMarkers.icon(
+            var icon_37b61b610e0433509502eb5008248d3e = L.AwesomeMarkers.icon(
                 {"extraClasses": "fa-rotate-0", "icon": "home", "iconColor": "white", "markerColor": "blue", "prefix": "fa"}
             );
-            marker_3ce629614ed658baf8bc8436a3bda04d.setIcon(icon_e87a917e165891ad08dc351c68f34519);
+            marker_2615e566505f9cc4c4303ba3ff88d986.setIcon(icon_37b61b610e0433509502eb5008248d3e);
         
     
-            marker_3ce629614ed658baf8bc8436a3bda04d.bindTooltip(
+            marker_2615e566505f9cc4c4303ba3ff88d986.bindTooltip(
                 `<div>
                      <span data-bid="361978375" data-bname="Building 361978375">Building 361978375</span>
                  </div>`,
@@ -2410,19 +2437,19 @@ function showPathOnMap(buildingId, pathIndex) {
             );
         
     
-            var marker_e122a56d6146b1f601eb689d523f3091 = L.marker(
+            var marker_887be414d926d430e1b833296ca9ebdb = L.marker(
                 [31.2660055, 34.8026122],
                 {}
-            ).addTo(map_9bbac5976436722e6b84a5cb33dda288);
+            ).addTo(map_d9707c4db0f907381814424872f25027);
         
     
-            var icon_5e527afa8289d4b1f941e485aa608d57 = L.AwesomeMarkers.icon(
+            var icon_12189a93f52d1965e4263a0ef739c9a3 = L.AwesomeMarkers.icon(
                 {"extraClasses": "fa-rotate-0", "icon": "home", "iconColor": "white", "markerColor": "blue", "prefix": "fa"}
             );
-            marker_e122a56d6146b1f601eb689d523f3091.setIcon(icon_5e527afa8289d4b1f941e485aa608d57);
+            marker_887be414d926d430e1b833296ca9ebdb.setIcon(icon_12189a93f52d1965e4263a0ef739c9a3);
         
     
-            marker_e122a56d6146b1f601eb689d523f3091.bindTooltip(
+            marker_887be414d926d430e1b833296ca9ebdb.bindTooltip(
                 `<div>
                      <span data-bid="361978376" data-bname="Building 361978376">Building 361978376</span>
                  </div>`,
@@ -2430,19 +2457,19 @@ function showPathOnMap(buildingId, pathIndex) {
             );
         
     
-            var marker_dfdc2557dfd145a80011912fc5c3c0b0 = L.marker(
+            var marker_adc8189cf2357d07756f0ff24b569b2a = L.marker(
                 [31.2653559, 34.8020443],
                 {}
-            ).addTo(map_9bbac5976436722e6b84a5cb33dda288);
+            ).addTo(map_d9707c4db0f907381814424872f25027);
         
     
-            var icon_085ecb8b2b3182ed4ad73e15b191d153 = L.AwesomeMarkers.icon(
+            var icon_3f0d97be2db72505be9c5c197b9c2748 = L.AwesomeMarkers.icon(
                 {"extraClasses": "fa-rotate-0", "icon": "home", "iconColor": "white", "markerColor": "blue", "prefix": "fa"}
             );
-            marker_dfdc2557dfd145a80011912fc5c3c0b0.setIcon(icon_085ecb8b2b3182ed4ad73e15b191d153);
+            marker_adc8189cf2357d07756f0ff24b569b2a.setIcon(icon_3f0d97be2db72505be9c5c197b9c2748);
         
     
-            marker_dfdc2557dfd145a80011912fc5c3c0b0.bindTooltip(
+            marker_adc8189cf2357d07756f0ff24b569b2a.bindTooltip(
                 `<div>
                      <span data-bid="361978377" data-bname="Building 361978377">Building 361978377</span>
                  </div>`,
@@ -2450,19 +2477,19 @@ function showPathOnMap(buildingId, pathIndex) {
             );
         
     
-            var marker_b19910c09c9bf53cdffb3a86c7628ad7 = L.marker(
+            var marker_89dadbe5486ca117c108121bc2852a8e = L.marker(
                 [31.2667559, 34.802257],
                 {}
-            ).addTo(map_9bbac5976436722e6b84a5cb33dda288);
+            ).addTo(map_d9707c4db0f907381814424872f25027);
         
     
-            var icon_76a48e34f4d44dcf6ce8cd43d7c22c16 = L.AwesomeMarkers.icon(
+            var icon_8f34383e6f0eeba5a3293447a837d78a = L.AwesomeMarkers.icon(
                 {"extraClasses": "fa-rotate-0", "icon": "home", "iconColor": "white", "markerColor": "blue", "prefix": "fa"}
             );
-            marker_b19910c09c9bf53cdffb3a86c7628ad7.setIcon(icon_76a48e34f4d44dcf6ce8cd43d7c22c16);
+            marker_89dadbe5486ca117c108121bc2852a8e.setIcon(icon_8f34383e6f0eeba5a3293447a837d78a);
         
     
-            marker_b19910c09c9bf53cdffb3a86c7628ad7.bindTooltip(
+            marker_89dadbe5486ca117c108121bc2852a8e.bindTooltip(
                 `<div>
                      <span data-bid="361978378" data-bname="Building 361978378">Building 361978378</span>
                  </div>`,
@@ -2470,19 +2497,19 @@ function showPathOnMap(buildingId, pathIndex) {
             );
         
     
-            var marker_5e6ee1ca63ad9efa6360d1cf813109b1 = L.marker(
+            var marker_c61dcc35d63ae67190943c250ac27514 = L.marker(
                 [31.2655553, 34.8027477],
                 {}
-            ).addTo(map_9bbac5976436722e6b84a5cb33dda288);
+            ).addTo(map_d9707c4db0f907381814424872f25027);
         
     
-            var icon_912d90983bda2769d1ab73e38f7cf286 = L.AwesomeMarkers.icon(
+            var icon_b2530c28fb6e096f8821b97b662399d3 = L.AwesomeMarkers.icon(
                 {"extraClasses": "fa-rotate-0", "icon": "home", "iconColor": "white", "markerColor": "blue", "prefix": "fa"}
             );
-            marker_5e6ee1ca63ad9efa6360d1cf813109b1.setIcon(icon_912d90983bda2769d1ab73e38f7cf286);
+            marker_c61dcc35d63ae67190943c250ac27514.setIcon(icon_b2530c28fb6e096f8821b97b662399d3);
         
     
-            marker_5e6ee1ca63ad9efa6360d1cf813109b1.bindTooltip(
+            marker_c61dcc35d63ae67190943c250ac27514.bindTooltip(
                 `<div>
                      <span data-bid="361978380" data-bname="Building 361978380">Building 361978380</span>
                  </div>`,
@@ -2490,19 +2517,19 @@ function showPathOnMap(buildingId, pathIndex) {
             );
         
     
-            var marker_a219258d4bc0d0d4197a85f984df7e5b = L.marker(
+            var marker_985e6a32f0a45f2114e62febd4367af8 = L.marker(
                 [31.2653307, 34.802753],
                 {}
-            ).addTo(map_9bbac5976436722e6b84a5cb33dda288);
+            ).addTo(map_d9707c4db0f907381814424872f25027);
         
     
-            var icon_3e32cd5beb2e1516ddb0ede1c8423baa = L.AwesomeMarkers.icon(
+            var icon_a1638be0e94a06876df6ac707f78a23a = L.AwesomeMarkers.icon(
                 {"extraClasses": "fa-rotate-0", "icon": "home", "iconColor": "white", "markerColor": "blue", "prefix": "fa"}
             );
-            marker_a219258d4bc0d0d4197a85f984df7e5b.setIcon(icon_3e32cd5beb2e1516ddb0ede1c8423baa);
+            marker_985e6a32f0a45f2114e62febd4367af8.setIcon(icon_a1638be0e94a06876df6ac707f78a23a);
         
     
-            marker_a219258d4bc0d0d4197a85f984df7e5b.bindTooltip(
+            marker_985e6a32f0a45f2114e62febd4367af8.bindTooltip(
                 `<div>
                      <span data-bid="361978381" data-bname="Building 361978381">Building 361978381</span>
                  </div>`,
@@ -2510,19 +2537,19 @@ function showPathOnMap(buildingId, pathIndex) {
             );
         
     
-            var marker_c858a04507e3b218f7ecfd1b98310b74 = L.marker(
+            var marker_6a57e3fdf8c05fc90b94703998563934 = L.marker(
                 [31.2705148, 34.8024225],
                 {}
-            ).addTo(map_9bbac5976436722e6b84a5cb33dda288);
+            ).addTo(map_d9707c4db0f907381814424872f25027);
         
     
-            var icon_760b6b7663551b847154b761eb60bdd3 = L.AwesomeMarkers.icon(
+            var icon_486ce0457af60021cb742cb3744bf559 = L.AwesomeMarkers.icon(
                 {"extraClasses": "fa-rotate-0", "icon": "home", "iconColor": "white", "markerColor": "blue", "prefix": "fa"}
             );
-            marker_c858a04507e3b218f7ecfd1b98310b74.setIcon(icon_760b6b7663551b847154b761eb60bdd3);
+            marker_6a57e3fdf8c05fc90b94703998563934.setIcon(icon_486ce0457af60021cb742cb3744bf559);
         
     
-            marker_c858a04507e3b218f7ecfd1b98310b74.bindTooltip(
+            marker_6a57e3fdf8c05fc90b94703998563934.bindTooltip(
                 `<div>
                      <span data-bid="531651766" data-bname="Building 531651766">Building 531651766</span>
                  </div>`,
@@ -2530,19 +2557,19 @@ function showPathOnMap(buildingId, pathIndex) {
             );
         
     
-            var marker_3365664b94722a379eb1784cf0425eb1 = L.marker(
+            var marker_0914a7360752718c25de2ce164d6b7e2 = L.marker(
                 [31.2716033, 34.8027624],
                 {}
-            ).addTo(map_9bbac5976436722e6b84a5cb33dda288);
+            ).addTo(map_d9707c4db0f907381814424872f25027);
         
     
-            var icon_59f17e764fe1f1f5d891f35471cff087 = L.AwesomeMarkers.icon(
+            var icon_4e5fe83f89d109c532ef9e472d4ddf23 = L.AwesomeMarkers.icon(
                 {"extraClasses": "fa-rotate-0", "icon": "home", "iconColor": "white", "markerColor": "blue", "prefix": "fa"}
             );
-            marker_3365664b94722a379eb1784cf0425eb1.setIcon(icon_59f17e764fe1f1f5d891f35471cff087);
+            marker_0914a7360752718c25de2ce164d6b7e2.setIcon(icon_4e5fe83f89d109c532ef9e472d4ddf23);
         
     
-            marker_3365664b94722a379eb1784cf0425eb1.bindTooltip(
+            marker_0914a7360752718c25de2ce164d6b7e2.bindTooltip(
                 `<div>
                      <span data-bid="541595075" data-bname="Building 541595075">Building 541595075</span>
                  </div>`,
@@ -2550,19 +2577,19 @@ function showPathOnMap(buildingId, pathIndex) {
             );
         
     
-            var marker_99e0f8684e58c0548b12f48d3ce1affa = L.marker(
+            var marker_dae1a810a72dbc480c56239880b92ccd = L.marker(
                 [31.2715258, 34.8025981],
                 {}
-            ).addTo(map_9bbac5976436722e6b84a5cb33dda288);
+            ).addTo(map_d9707c4db0f907381814424872f25027);
         
     
-            var icon_be82b29e9c8256b9c5859bd6cfa163b3 = L.AwesomeMarkers.icon(
+            var icon_5d5d54a0c5200fc711b8e2e2ec08a370 = L.AwesomeMarkers.icon(
                 {"extraClasses": "fa-rotate-0", "icon": "home", "iconColor": "white", "markerColor": "blue", "prefix": "fa"}
             );
-            marker_99e0f8684e58c0548b12f48d3ce1affa.setIcon(icon_be82b29e9c8256b9c5859bd6cfa163b3);
+            marker_dae1a810a72dbc480c56239880b92ccd.setIcon(icon_5d5d54a0c5200fc711b8e2e2ec08a370);
         
     
-            marker_99e0f8684e58c0548b12f48d3ce1affa.bindTooltip(
+            marker_dae1a810a72dbc480c56239880b92ccd.bindTooltip(
                 `<div>
                      <span data-bid="541595076" data-bname="Building 541595076">Building 541595076</span>
                  </div>`,
@@ -2570,19 +2597,19 @@ function showPathOnMap(buildingId, pathIndex) {
             );
         
     
-            var marker_3d7662832b789d0c66bf044e3a944ba6 = L.marker(
+            var marker_7ad7254a1209b1c17be512f5bc5e041e = L.marker(
                 [31.2714594, 34.8024344],
                 {}
-            ).addTo(map_9bbac5976436722e6b84a5cb33dda288);
+            ).addTo(map_d9707c4db0f907381814424872f25027);
         
     
-            var icon_37af155be20bfa990da605315a228c9f = L.AwesomeMarkers.icon(
+            var icon_c904ac339562736fbea64e3ed3f9fbb4 = L.AwesomeMarkers.icon(
                 {"extraClasses": "fa-rotate-0", "icon": "home", "iconColor": "white", "markerColor": "blue", "prefix": "fa"}
             );
-            marker_3d7662832b789d0c66bf044e3a944ba6.setIcon(icon_37af155be20bfa990da605315a228c9f);
+            marker_7ad7254a1209b1c17be512f5bc5e041e.setIcon(icon_c904ac339562736fbea64e3ed3f9fbb4);
         
     
-            marker_3d7662832b789d0c66bf044e3a944ba6.bindTooltip(
+            marker_7ad7254a1209b1c17be512f5bc5e041e.bindTooltip(
                 `<div>
                      <span data-bid="541595077" data-bname="Building 541595077">Building 541595077</span>
                  </div>`,
@@ -2590,19 +2617,19 @@ function showPathOnMap(buildingId, pathIndex) {
             );
         
     
-            var marker_027b328c964621c7de902dea9e109465 = L.marker(
+            var marker_283eaac0fad0a76ce90952ab7c466562 = L.marker(
                 [31.2714136, 34.8022689],
                 {}
-            ).addTo(map_9bbac5976436722e6b84a5cb33dda288);
+            ).addTo(map_d9707c4db0f907381814424872f25027);
         
     
-            var icon_d61ee090ca6023b0407387e9d01eef30 = L.AwesomeMarkers.icon(
+            var icon_1434568abceee9a165f8488e5ff661cb = L.AwesomeMarkers.icon(
                 {"extraClasses": "fa-rotate-0", "icon": "home", "iconColor": "white", "markerColor": "blue", "prefix": "fa"}
             );
-            marker_027b328c964621c7de902dea9e109465.setIcon(icon_d61ee090ca6023b0407387e9d01eef30);
+            marker_283eaac0fad0a76ce90952ab7c466562.setIcon(icon_1434568abceee9a165f8488e5ff661cb);
         
     
-            marker_027b328c964621c7de902dea9e109465.bindTooltip(
+            marker_283eaac0fad0a76ce90952ab7c466562.bindTooltip(
                 `<div>
                      <span data-bid="541595078" data-bname="Building 541595078">Building 541595078</span>
                  </div>`,
@@ -2610,19 +2637,19 @@ function showPathOnMap(buildingId, pathIndex) {
             );
         
     
-            var marker_9ad7a5932a299fb05b1696fe426ea423 = L.marker(
+            var marker_5937a69db9441427d120982326183b10 = L.marker(
                 [31.2713149, 34.8021119],
                 {}
-            ).addTo(map_9bbac5976436722e6b84a5cb33dda288);
+            ).addTo(map_d9707c4db0f907381814424872f25027);
         
     
-            var icon_f4786d6860f6cc1f7dcde17d59040e16 = L.AwesomeMarkers.icon(
+            var icon_5036a1635cd162602f9ee3d3f90b6e0c = L.AwesomeMarkers.icon(
                 {"extraClasses": "fa-rotate-0", "icon": "home", "iconColor": "white", "markerColor": "blue", "prefix": "fa"}
             );
-            marker_9ad7a5932a299fb05b1696fe426ea423.setIcon(icon_f4786d6860f6cc1f7dcde17d59040e16);
+            marker_5937a69db9441427d120982326183b10.setIcon(icon_5036a1635cd162602f9ee3d3f90b6e0c);
         
     
-            marker_9ad7a5932a299fb05b1696fe426ea423.bindTooltip(
+            marker_5937a69db9441427d120982326183b10.bindTooltip(
                 `<div>
                      <span data-bid="541595079" data-bname="Building 541595079">Building 541595079</span>
                  </div>`,
@@ -2630,19 +2657,19 @@ function showPathOnMap(buildingId, pathIndex) {
             );
         
     
-            var marker_f1d46eba68a87bd4b7e24290add36905 = L.marker(
+            var marker_a1d4dbb8ad4cab627d3ce320806a6e04 = L.marker(
                 [31.2712295, 34.8019228],
                 {}
-            ).addTo(map_9bbac5976436722e6b84a5cb33dda288);
+            ).addTo(map_d9707c4db0f907381814424872f25027);
         
     
-            var icon_7ff893e83d6fb4a00b6d293ce8f85019 = L.AwesomeMarkers.icon(
+            var icon_60913d36bd5a4905f3301869fe67309e = L.AwesomeMarkers.icon(
                 {"extraClasses": "fa-rotate-0", "icon": "home", "iconColor": "white", "markerColor": "blue", "prefix": "fa"}
             );
-            marker_f1d46eba68a87bd4b7e24290add36905.setIcon(icon_7ff893e83d6fb4a00b6d293ce8f85019);
+            marker_a1d4dbb8ad4cab627d3ce320806a6e04.setIcon(icon_60913d36bd5a4905f3301869fe67309e);
         
     
-            marker_f1d46eba68a87bd4b7e24290add36905.bindTooltip(
+            marker_a1d4dbb8ad4cab627d3ce320806a6e04.bindTooltip(
                 `<div>
                      <span data-bid="541595080" data-bname="Building 541595080">Building 541595080</span>
                  </div>`,
@@ -2650,19 +2677,19 @@ function showPathOnMap(buildingId, pathIndex) {
             );
         
     
-            var marker_3b425ad3bb2c33e7e60a946f5f91ad09 = L.marker(
+            var marker_1fae308f1fe83b456872caa7e9412575 = L.marker(
                 [31.2711665, 34.8017699],
                 {}
-            ).addTo(map_9bbac5976436722e6b84a5cb33dda288);
+            ).addTo(map_d9707c4db0f907381814424872f25027);
         
     
-            var icon_3f1aec9c12d9af0fdb0972d389e3a36a = L.AwesomeMarkers.icon(
+            var icon_3be9004a7534083e4acf3306db9de1be = L.AwesomeMarkers.icon(
                 {"extraClasses": "fa-rotate-0", "icon": "home", "iconColor": "white", "markerColor": "blue", "prefix": "fa"}
             );
-            marker_3b425ad3bb2c33e7e60a946f5f91ad09.setIcon(icon_3f1aec9c12d9af0fdb0972d389e3a36a);
+            marker_1fae308f1fe83b456872caa7e9412575.setIcon(icon_3be9004a7534083e4acf3306db9de1be);
         
     
-            marker_3b425ad3bb2c33e7e60a946f5f91ad09.bindTooltip(
+            marker_1fae308f1fe83b456872caa7e9412575.bindTooltip(
                 `<div>
                      <span data-bid="541595081" data-bname="Building 541595081">Building 541595081</span>
                  </div>`,
@@ -2670,19 +2697,19 @@ function showPathOnMap(buildingId, pathIndex) {
             );
         
     
-            var marker_d8eb7b103b90cde302f99c6aaaf2b8c5 = L.marker(
+            var marker_b829952ce8c98504dac76979004cb695 = L.marker(
                 [31.2715052, 34.8015548],
                 {}
-            ).addTo(map_9bbac5976436722e6b84a5cb33dda288);
+            ).addTo(map_d9707c4db0f907381814424872f25027);
         
     
-            var icon_2cf775fcebdc3be4d30f79e70daad4ec = L.AwesomeMarkers.icon(
+            var icon_04592e1846572c966d4e64005817645f = L.AwesomeMarkers.icon(
                 {"extraClasses": "fa-rotate-0", "icon": "home", "iconColor": "white", "markerColor": "blue", "prefix": "fa"}
             );
-            marker_d8eb7b103b90cde302f99c6aaaf2b8c5.setIcon(icon_2cf775fcebdc3be4d30f79e70daad4ec);
+            marker_b829952ce8c98504dac76979004cb695.setIcon(icon_04592e1846572c966d4e64005817645f);
         
     
-            marker_d8eb7b103b90cde302f99c6aaaf2b8c5.bindTooltip(
+            marker_b829952ce8c98504dac76979004cb695.bindTooltip(
                 `<div>
                      <span data-bid="541595082" data-bname="Building 541595082">Building 541595082</span>
                  </div>`,
@@ -2690,19 +2717,19 @@ function showPathOnMap(buildingId, pathIndex) {
             );
         
     
-            var marker_5db570714472dadaa4c285e1df664315 = L.marker(
+            var marker_8ec694068b787f8f6149b4b71358714b = L.marker(
                 [31.2715809, 34.801725],
                 {}
-            ).addTo(map_9bbac5976436722e6b84a5cb33dda288);
+            ).addTo(map_d9707c4db0f907381814424872f25027);
         
     
-            var icon_01b15d8aad2d753d2fc511be77fc637c = L.AwesomeMarkers.icon(
+            var icon_7dc863ed066e5ed4297786b4c274aebe = L.AwesomeMarkers.icon(
                 {"extraClasses": "fa-rotate-0", "icon": "home", "iconColor": "white", "markerColor": "blue", "prefix": "fa"}
             );
-            marker_5db570714472dadaa4c285e1df664315.setIcon(icon_01b15d8aad2d753d2fc511be77fc637c);
+            marker_8ec694068b787f8f6149b4b71358714b.setIcon(icon_7dc863ed066e5ed4297786b4c274aebe);
         
     
-            marker_5db570714472dadaa4c285e1df664315.bindTooltip(
+            marker_8ec694068b787f8f6149b4b71358714b.bindTooltip(
                 `<div>
                      <span data-bid="541595083" data-bname="Building 541595083">Building 541595083</span>
                  </div>`,
@@ -2710,19 +2737,19 @@ function showPathOnMap(buildingId, pathIndex) {
             );
         
     
-            var marker_3e4b517e09a2c3cce66fe0ae18752659 = L.marker(
+            var marker_a0eaf9d3f353c74373751ca8a213501f = L.marker(
                 [31.2714572, 34.8037394],
                 {}
-            ).addTo(map_9bbac5976436722e6b84a5cb33dda288);
+            ).addTo(map_d9707c4db0f907381814424872f25027);
         
     
-            var icon_bc7c1ea586672e2ab9d533135ae3c894 = L.AwesomeMarkers.icon(
+            var icon_ea900f3027543eb842726cdd2b520054 = L.AwesomeMarkers.icon(
                 {"extraClasses": "fa-rotate-0", "icon": "home", "iconColor": "white", "markerColor": "blue", "prefix": "fa"}
             );
-            marker_3e4b517e09a2c3cce66fe0ae18752659.setIcon(icon_bc7c1ea586672e2ab9d533135ae3c894);
+            marker_a0eaf9d3f353c74373751ca8a213501f.setIcon(icon_ea900f3027543eb842726cdd2b520054);
         
     
-            marker_3e4b517e09a2c3cce66fe0ae18752659.bindTooltip(
+            marker_a0eaf9d3f353c74373751ca8a213501f.bindTooltip(
                 `<div>
                      <span data-bid="541595473" data-bname="Building 541595473">Building 541595473</span>
                  </div>`,
@@ -2730,19 +2757,19 @@ function showPathOnMap(buildingId, pathIndex) {
             );
         
     
-            var marker_081aa60e18cf3144b460d99853230b48 = L.marker(
+            var marker_3bef568e27e88e30569b1a7981577ccc = L.marker(
                 [31.2713822, 34.8035859],
                 {}
-            ).addTo(map_9bbac5976436722e6b84a5cb33dda288);
+            ).addTo(map_d9707c4db0f907381814424872f25027);
         
     
-            var icon_d2092cb30154a21be50288fa01cb53ed = L.AwesomeMarkers.icon(
+            var icon_6739b731fd9ef237e4084da770fc7ac7 = L.AwesomeMarkers.icon(
                 {"extraClasses": "fa-rotate-0", "icon": "home", "iconColor": "white", "markerColor": "blue", "prefix": "fa"}
             );
-            marker_081aa60e18cf3144b460d99853230b48.setIcon(icon_d2092cb30154a21be50288fa01cb53ed);
+            marker_3bef568e27e88e30569b1a7981577ccc.setIcon(icon_6739b731fd9ef237e4084da770fc7ac7);
         
     
-            marker_081aa60e18cf3144b460d99853230b48.bindTooltip(
+            marker_3bef568e27e88e30569b1a7981577ccc.bindTooltip(
                 `<div>
                      <span data-bid="541595474" data-bname="Building 541595474">Building 541595474</span>
                  </div>`,
@@ -2750,19 +2777,19 @@ function showPathOnMap(buildingId, pathIndex) {
             );
         
     
-            var marker_abce20bf473baf69f703c894174069e5 = L.marker(
+            var marker_772f79beb931f49226f91bed023217a0 = L.marker(
                 [31.2715741, 34.8034651],
                 {}
-            ).addTo(map_9bbac5976436722e6b84a5cb33dda288);
+            ).addTo(map_d9707c4db0f907381814424872f25027);
         
     
-            var icon_8ed43e83440469c7f5827e4750503b2f = L.AwesomeMarkers.icon(
+            var icon_7b61b0b10eac3fc4df896768f95f9c17 = L.AwesomeMarkers.icon(
                 {"extraClasses": "fa-rotate-0", "icon": "home", "iconColor": "white", "markerColor": "blue", "prefix": "fa"}
             );
-            marker_abce20bf473baf69f703c894174069e5.setIcon(icon_8ed43e83440469c7f5827e4750503b2f);
+            marker_772f79beb931f49226f91bed023217a0.setIcon(icon_7b61b0b10eac3fc4df896768f95f9c17);
         
     
-            marker_abce20bf473baf69f703c894174069e5.bindTooltip(
+            marker_772f79beb931f49226f91bed023217a0.bindTooltip(
                 `<div>
                      <span data-bid="541595475" data-bname="Building 541595475">Building 541595475</span>
                  </div>`,
@@ -2770,19 +2797,19 @@ function showPathOnMap(buildingId, pathIndex) {
             );
         
     
-            var marker_852b742c0a7d3f565253fd928ec01e28 = L.marker(
+            var marker_01c1f21d08fa5cbd45907c1c765efe82 = L.marker(
                 [31.2716463, 34.803624],
                 {}
-            ).addTo(map_9bbac5976436722e6b84a5cb33dda288);
+            ).addTo(map_d9707c4db0f907381814424872f25027);
         
     
-            var icon_b23e411d41a8f88c6895e0dbffa32498 = L.AwesomeMarkers.icon(
+            var icon_0d2f58be6fc4f22718b71c39ebf17f4a = L.AwesomeMarkers.icon(
                 {"extraClasses": "fa-rotate-0", "icon": "home", "iconColor": "white", "markerColor": "blue", "prefix": "fa"}
             );
-            marker_852b742c0a7d3f565253fd928ec01e28.setIcon(icon_b23e411d41a8f88c6895e0dbffa32498);
+            marker_01c1f21d08fa5cbd45907c1c765efe82.setIcon(icon_0d2f58be6fc4f22718b71c39ebf17f4a);
         
     
-            marker_852b742c0a7d3f565253fd928ec01e28.bindTooltip(
+            marker_01c1f21d08fa5cbd45907c1c765efe82.bindTooltip(
                 `<div>
                      <span data-bid="541595476" data-bname="Building 541595476">Building 541595476</span>
                  </div>`,
@@ -2790,19 +2817,19 @@ function showPathOnMap(buildingId, pathIndex) {
             );
         
     
-            var marker_141bfac8f3069014cb05e4b9ca1b3bb5 = L.marker(
+            var marker_c3cc9351e23095b9fe143d6819afcce1 = L.marker(
                 [31.2710565, 34.8037709],
                 {}
-            ).addTo(map_9bbac5976436722e6b84a5cb33dda288);
+            ).addTo(map_d9707c4db0f907381814424872f25027);
         
     
-            var icon_8e0037f71b9fafd6649930b2aa9fafc1 = L.AwesomeMarkers.icon(
+            var icon_1e6f031ab012a02795446b40bce9e3a3 = L.AwesomeMarkers.icon(
                 {"extraClasses": "fa-rotate-0", "icon": "home", "iconColor": "white", "markerColor": "blue", "prefix": "fa"}
             );
-            marker_141bfac8f3069014cb05e4b9ca1b3bb5.setIcon(icon_8e0037f71b9fafd6649930b2aa9fafc1);
+            marker_c3cc9351e23095b9fe143d6819afcce1.setIcon(icon_1e6f031ab012a02795446b40bce9e3a3);
         
     
-            marker_141bfac8f3069014cb05e4b9ca1b3bb5.bindTooltip(
+            marker_c3cc9351e23095b9fe143d6819afcce1.bindTooltip(
                 `<div>
                      <span data-bid="541595481" data-bname="Building 541595481">Building 541595481</span>
                  </div>`,
@@ -2810,19 +2837,19 @@ function showPathOnMap(buildingId, pathIndex) {
             );
         
     
-            var marker_9bc5d8f2d1c2f31d505448808d3c5430 = L.marker(
+            var marker_18e61d5d10e2e2466c6c8ed980842193 = L.marker(
                 [31.2651527, 34.8016334],
                 {}
-            ).addTo(map_9bbac5976436722e6b84a5cb33dda288);
+            ).addTo(map_d9707c4db0f907381814424872f25027);
         
     
-            var icon_c5f9084f7b9a089eb341dbcddc6a2690 = L.AwesomeMarkers.icon(
+            var icon_d2b2c98a8d6fbfbbb6140f917cf90f92 = L.AwesomeMarkers.icon(
                 {"extraClasses": "fa-rotate-0", "icon": "home", "iconColor": "white", "markerColor": "blue", "prefix": "fa"}
             );
-            marker_9bc5d8f2d1c2f31d505448808d3c5430.setIcon(icon_c5f9084f7b9a089eb341dbcddc6a2690);
+            marker_18e61d5d10e2e2466c6c8ed980842193.setIcon(icon_d2b2c98a8d6fbfbbb6140f917cf90f92);
         
     
-            marker_9bc5d8f2d1c2f31d505448808d3c5430.bindTooltip(
+            marker_18e61d5d10e2e2466c6c8ed980842193.bindTooltip(
                 `<div>
                      <span data-bid="767705648" data-bname="Building 767705648">Building 767705648</span>
                  </div>`,
@@ -2830,19 +2857,19 @@ function showPathOnMap(buildingId, pathIndex) {
             );
         
     
-            var marker_4fd26466671c4342e5614ae606832934 = L.marker(
+            var marker_f2274c29a86f19ec252c0e74ca879377 = L.marker(
                 [31.263095044444444, 34.80124541111111],
                 {}
-            ).addTo(map_9bbac5976436722e6b84a5cb33dda288);
+            ).addTo(map_d9707c4db0f907381814424872f25027);
         
     
-            var icon_2443957363378377751029b9f5e9ab3e = L.AwesomeMarkers.icon(
+            var icon_18e38a1214869b0ff408e853381011ec = L.AwesomeMarkers.icon(
                 {"extraClasses": "fa-rotate-0", "icon": "star", "iconColor": "white", "markerColor": "red", "prefix": "fa"}
             );
-            marker_4fd26466671c4342e5614ae606832934.setIcon(icon_2443957363378377751029b9f5e9ab3e);
+            marker_f2274c29a86f19ec252c0e74ca879377.setIcon(icon_18e38a1214869b0ff408e853381011ec);
         
     
-            marker_4fd26466671c4342e5614ae606832934.bindTooltip(
+            marker_f2274c29a86f19ec252c0e74ca879377.bindTooltip(
                 `<div>
                      Target: 135310103
                  </div>`,

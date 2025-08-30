@@ -40,6 +40,12 @@ class PathResult:
     safety_penalties: float
     time_seconds: float
     description: str
+    nodes_expanded_forward: int = 0
+    nodes_expanded_backward: int = 0
+    edges_scanned_forward: int = 0
+    edges_scanned_backward: int = 0
+    stale_pops_forward: int = 0
+    stale_pops_backward: int = 0
 
 # --------------------------- Pathfinder -----------------------------
 
@@ -116,12 +122,21 @@ class OSMPathfinder:
         print("Building graphs (forward & reverse)…")
         for way in self.ways.values():
             tags = way.tags
-            # treat one-way for pedestrians only if explicitly tagged
+            # For pedestrians, most oneway restrictions don't apply
+            # Only restrict if explicitly foot=no or specific pedestrian oneway restrictions
             oneway_car = tags.get('oneway') == 'yes'
-            oneway_foot = tags.get('oneway:foot') == 'yes'
-            is_steps = tags.get('highway') == 'steps'
-            # steps are bidirectional for walking unless explicitly tagged one-way:foot
-            is_oneway_for_ped = oneway_foot  # ignore car oneway for pedestrians
+            highway = tags.get('highway', '')
+            
+            # Pedestrians can generally walk both ways on most roads, even if oneway for cars
+            # Exception: some highway types where pedestrians should follow car direction
+            is_oneway_for_ped = False
+            if oneway_car:
+                # On these highway types, pedestrians should respect car oneway
+                if highway in {'motorway', 'motorway_link', 'trunk', 'trunk_link', 'primary'}:
+                    is_oneway_for_ped = True
+                # If there's explicit foot restriction, respect it
+                elif tags.get('foot') == 'no':
+                    continue  # Skip this way entirely for pedestrians
 
             for i in range(len(way.nodes) - 1):
                 a, b = way.nodes[i], way.nodes[i+1]
@@ -154,9 +169,7 @@ class OSMPathfinder:
             'school','kindergarten','university','library','community_centre',
             'place_of_worship','synagogue','police','clinic','hospital'
         }
-        leisure_whitelist = {
-            'playground','pitch','sports_centre','stadium','park','garden'
-        }
+        leisure_whitelist = {'playground','pitch','sports_centre','stadium','park','garden'}
 
         # Collect public place nodes
         public_node_ids: List[str] = []
@@ -301,13 +314,13 @@ class OSMPathfinder:
 
         return c
 
-    def _cost_safest(self, e, from_id, is_night: bool):
+    def _cost_safest(self, e, from_id):
         c = e['distance']
         wt = e['way_tags']
         # lighting along way or at node
         way_lit = wt.get('lit')
         if (way_lit == 'no') or (way_lit is None and self.nodes[e['to_node']].tags.get('lit') == 'no'):
-            c += 150.0 if is_night else 25.0
+            c += 150.0 
 
         if way_lit == 'yes' or (way_lit is None and self.nodes[e['to_node']].tags.get('lit') == 'yes'):
             c -= 10.0
@@ -315,18 +328,18 @@ class OSMPathfinder:
         # alley/service and road classification when mixing with traffic
         hw = wt.get('highway')
         if hw in {'alley','service'}:
-            c += 90.0 if is_night else 25.0
+            c += 90.0
         if hw in {'primary','secondary','tertiary'} and wt.get('sidewalk', '') in {'no','none',''}:
-            c += 140.0 if is_night else 50.0
+            c += 140.0
 
         # sidewalks
         sw = wt.get('sidewalk', '')
         if sw in {'none','no',''} and hw not in {'footway','pedestrian','path'}:
-            c += 90.0 if is_night else 25.0
+            c += 90.0
 
         # shared cycle/foot paths without segregation are a bit less comfortable
         if hw in {'path','footway'} and wt.get('bicycle') in {'yes','designated'} and wt.get('segregated') == 'no':
-            c += 30.0 if is_night else 10.0
+            c += 30.0
 
         # surface: poor surfaces feel less safe or comfortable
         surf = wt.get('surface','')
@@ -344,7 +357,7 @@ class OSMPathfinder:
             pass
 
         # tunnels/bridges at night
-        if is_night and (wt.get('tunnel') == 'yes' or wt.get('bridge') == 'yes'):
+        if (wt.get('tunnel') == 'yes' or wt.get('bridge') == 'yes'):
             c += 50.0
 
         # node-based crossing safety: uncontrolled crossings are worse; zebra better
@@ -374,7 +387,7 @@ class OSMPathfinder:
             or leisure in {'playground','pitch','sports_centre','stadium','park','garden','fitness_centre','dog_park','swimming_pool'}
             or nt.get('near_public_place') == 'yes'
         ):
-            bonus = 40.0 if is_night else 20.0
+            bonus = 40.0
         if bonus:
             c = max(e['distance'], c - bonus)
 
@@ -445,9 +458,9 @@ class OSMPathfinder:
 
     # ---------------- Bidirectional A* (Front-to-Front) ----------------
 
-    def bidir_astar(self, start: str, goal: str, profile: str, is_night=False) -> Optional[PathResult]:
+    def bidir_astar(self, start: str, goal: str, profile: str) -> Optional[PathResult]:
         if start == goal:
-            return self._calc_stats([start], profile, is_night)
+            return self._calc_stats([start], profile)
         if start not in self.graph or goal not in self.graph:
             return None
 
@@ -455,7 +468,7 @@ class OSMPathfinder:
         def edge_cost(e, u):
             if profile == 'shortest': return self._cost_shortest(e, u)
             if profile == 'few_traffic_lights': return self._cost_few_traffic_lights(e, u)
-            if profile == 'safest': return self._cost_safest(e, u, is_night)
+            if profile == 'safest': return self._cost_safest(e, u)
             if profile == 'fastest': return self._cost_fastest(e, u)
             return self._cost_shortest(e, u)
 
@@ -486,6 +499,12 @@ class OSMPathfinder:
 
         UB = float('inf')
         meet = None  # ('node', m) or ('edge', u, v)
+        forward_expanded = 0
+        backward_expanded = 0
+        forward_edges_scanned = 0
+        backward_edges_scanned = 0
+        stale_pops_f = 0
+        stale_pops_b = 0
 
         def top_key(pq):
             # return current min f, skipping stale
@@ -503,7 +522,14 @@ class OSMPathfinder:
 
         def relax_dir(u, g_u, graph_dir, g_here, g_other, pred_here, h_here, open_here, is_forward: bool):
             nonlocal UB, meet
+            nonlocal forward_edges_scanned, backward_edges_scanned
+
             for e in graph_dir.get(u, []):
+                if is_forward:
+                    forward_edges_scanned += 1
+                else:
+                    backward_edges_scanned += 1
+
                 v = e['to_node']
                 c = edge_cost(e, u)
                 if c < 0:
@@ -527,17 +553,25 @@ class OSMPathfinder:
             if top_key(openF) <= top_key(openB):
                 # Forward step
                 f_u, g_u, u = heapq.heappop(openF)
-                if u in closedF or g_u != gF.get(u, float('inf')):
+                if u in closedF:
+                    continue
+                if g_u != gF.get(u, float('inf')):
+                    stale_pops_f += 1
                     continue
                 closedF.add(u)
+                forward_expanded += 1
                 improve_UB_via_node(u)
                 relax_dir(u, g_u, self.graph, gF, gB, predF, hF, openF, True)
             else:
                 # Backward step
                 f_u, g_u, u = heapq.heappop(openB)
-                if u in closedB or g_u != gB.get(u, float('inf')):
+                if u in closedB:
                     continue
+                if g_u != gB.get(u, float('inf')):
+                    stale_pops_b += 1
+                    continue                    
                 closedB.add(u)
+                backward_expanded += 1
                 improve_UB_via_node(u)
                 relax_dir(u, g_u, self.rgraph, gB, gF, predB, hB, openB, False)
 
@@ -577,11 +611,17 @@ class OSMPathfinder:
             mid_tail = build_forward_path_from_using_B(v)  # starts with v
             path = head + mid_tail  # includes u->v
 
-        return self._calc_stats(path, profile, is_night)
-
+        pr = self._calc_stats(path, profile)
+        pr.nodes_expanded_forward = forward_expanded
+        pr.nodes_expanded_backward = backward_expanded
+        pr.edges_scanned_forward = forward_edges_scanned
+        pr.edges_scanned_backward = backward_edges_scanned
+        pr.stale_pops_forward = stale_pops_f
+        pr.stale_pops_backward = stale_pops_b
+        return pr
     # -------------------- Stats & JSON export --------------------
 
-    def _calc_stats(self, path: List[str], profile: str, is_night: bool) -> PathResult:
+    def _calc_stats(self, path: List[str], profile: str) -> PathResult:
         dist = 0.0; sig = 0; cross = 0; safepen = 0.0; cost = 0.0; tsec = 0.0
         for i in range(len(path)-1):
             u, v = path[i], path[i+1]
@@ -596,13 +636,13 @@ class OSMPathfinder:
             elif profile == 'few_traffic_lights':
                 c = self._cost_few_traffic_lights(edge, u)
             elif profile == 'safest':
-                c = self._cost_safest(edge, u, is_night)
+                c = self._cost_safest(edge, u)
             elif profile == 'fastest':
                 c = self._cost_fastest(edge, u)
             else:
                 c = self._cost_shortest(edge, u)
             cost += c
-            safepen += self._cost_safest(edge, u, is_night) - edge['distance']
+            safepen += self._cost_safest(edge, u) - edge['distance']
             tsec += self._cost_fastest(edge, u)
 
             # node-based counters on v
@@ -648,7 +688,7 @@ class OSMPathfinder:
         results: List[PathResult] = []
         for prof in ['shortest','few_traffic_lights','safest','fastest']:
             print(f"  → {prof} … ", end="", flush=True)
-            r = self.bidir_astar(start, goal_walk, prof, is_night=False)
+            r = self.bidir_astar(start, goal_walk, prof)
             if r:
                 results.append(r)
                 print(f"ok  ({r.distance_meters:.0f} m, {r.time_seconds/60:.1f} min)")
@@ -679,7 +719,14 @@ class OSMPathfinder:
                     'num_crossings': pr.num_crossings,
                     'safety_penalties': pr.safety_penalties,
                     'time_seconds': pr.time_seconds,
+                    'nodes_expanded_forward': pr.nodes_expanded_forward,
+                    'nodes_expanded_backward': pr.nodes_expanded_backward,
+                    'edges_scanned_forward': pr.edges_scanned_forward,
+                    'edges_scanned_backward': pr.edges_scanned_backward,
+                    'stale_pops_forward': pr.stale_pops_forward,
+                    'stale_pops_backward': pr.stale_pops_backward,
                     'path_coordinates': coords
+                    
                 })
 
         # target metadata (node or building)

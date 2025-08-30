@@ -198,6 +198,10 @@ let currentPathLayer = null;                      // last "single-show" layer (f
 let currentBuildingLayers = {{}};                 // per-building: array of polylines
 let lastLoadedBuildingId = null;                  // remember which building is in the panel
 
+// Track all building markers so we can hide/show others when one is selected
+let __allBuildingMarkers = [];
+let __hiddenBuildingMarkers = [];
+
 function getLeafletMap() {{
   return window['{map_var}'];
 }}
@@ -223,6 +227,14 @@ function wireMarkerClicks() {{
       if (layer.__wiredPathsClick) return;
       layer.__wiredPathsClick = true;
 
+      // Register the marker once for hide/show management
+      if (!layer.__registeredBuildingMarker) {{
+        layer.__registeredBuildingMarker = true;
+        layer.__bid = bid;
+        layer.__bname = bname;
+        __allBuildingMarkers.push(layer);
+      }}
+
       layer.on('click', function() {{
         loadBuildingPathsLegend(bid, bname);
       }});
@@ -236,6 +248,8 @@ function clearSelectedPath() {{
     map.removeLayer(currentPathLayer);
     currentPathLayer = null;
   }}
+  // Restore all building markers when clearing
+  showAllBuildingMarkers();
 }}
 
 // Remove all existing per-building layers from map (for previous building)
@@ -248,6 +262,32 @@ function clearCurrentBuildingLayers() {{
   currentBuildingLayers[lastLoadedBuildingId] = [];
 }}
 
+// Hide all other building markers except the selected one
+function hideOtherBuildingMarkers(selectedBid) {{
+  const map = getLeafletMap();
+  if (!map) return;
+  __hiddenBuildingMarkers = [];
+  __allBuildingMarkers.forEach(m => {{
+    if (!m) return;
+    if (m.__bid !== selectedBid && map.hasLayer(m)) {{
+      map.removeLayer(m);
+      __hiddenBuildingMarkers.push(m);
+    }}
+  }});
+}}
+
+// Show back any previously hidden building markers
+function showAllBuildingMarkers() {{
+  const map = getLeafletMap();
+  if (!map) return;
+  __hiddenBuildingMarkers.forEach(m => {{
+    if (m && !map.hasLayer(m)) {{
+      m.addTo(map);
+    }}
+  }});
+  __hiddenBuildingMarkers = [];
+}}
+
 async function loadBuildingPathsLegend(buildingId, buildingName) {{
   const header = document.getElementById('legend_header');
   const body = document.getElementById('legend_body');
@@ -256,6 +296,9 @@ async function loadBuildingPathsLegend(buildingId, buildingName) {{
   clearCurrentBuildingLayers();
 
   lastLoadedBuildingId = buildingId;
+  // Hide other buildings so only the selected building marker remains visible
+  showAllBuildingMarkers();
+  hideOtherBuildingMarkers(buildingId);
   header.innerHTML = `
     <div class="tw-row" style="align-items:flex-start;">
       <div style="min-width:0;">
@@ -264,7 +307,8 @@ async function loadBuildingPathsLegend(buildingId, buildingName) {{
       <div style="display:flex; gap:8px; flex-wrap:wrap;">
         <button class="tw-btn tw-btn-ghost" onclick="toggleAllPaths(true)">Show All</button>
         <button class="tw-btn tw-btn-ghost" onclick="toggleAllPaths(false)">Hide All</button>
-        <button class="tw-btn tw-btn-primary" onclick="fitAllVisible()">Fit</button>
+  <button class="tw-btn tw-btn-primary" onclick="fitAllVisible()">Fit</button>
+  <button class="tw-btn tw-btn-ghost" onclick="showAllBuildingMarkers()" title="Show all building markers again">Show Buildings</button>
       </div>
     </div>
   `;
@@ -325,6 +369,9 @@ async function loadBuildingPathsLegend(buildingId, buildingName) {{
     }});
 
     body.innerHTML = html;
+    
+    // Automatically show all paths when building is selected
+    toggleAllPaths(true);
   }} catch (e) {{
     body.innerHTML = '<p style="color:red;">Error: ' + e.message + '</p>';
   }}

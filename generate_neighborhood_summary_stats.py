@@ -123,13 +123,18 @@ def process_json_file(file_path: str, target_coords: Tuple[float, float]) -> Lis
         for path_data in paths:
             algorithm = extract_algorithm_canonical_name(path_data.get('algorithm', ''))
             
-            # Extract all available metrics
+            # Extract all available metrics (with safe defaults if missing)
             distance_m = float(path_data.get('distance_meters', 0.0))
             time_s = float(path_data.get('time_seconds', 0.0))
             signals = int(path_data.get('num_traffic_signals', 0))
             crossings = int(path_data.get('num_crossings', 0))
             safety_penalties = float(path_data.get('safety_penalties', 0.0))
             total_cost = float(path_data.get('total_cost', 0.0))
+            # diagnostics from search (if exported)
+            nxf = int(path_data.get('nodes_expanded_forward', 0))
+            nxb = int(path_data.get('nodes_expanded_backward', 0))
+            esf = int(path_data.get('edges_scanned_forward', 0))
+            esb = int(path_data.get('edges_scanned_backward', 0))
             
             # Calculate additional derived metrics
             detour_factor = calculate_detour_factor(distance_m, straight_line_dist)
@@ -139,28 +144,20 @@ def process_json_file(file_path: str, target_coords: Tuple[float, float]) -> Lis
             # Calculate average walking speed (m/s)
             avg_walking_speed = distance_m / time_s if time_s > 0 else 0.0
             
-            # Calculate time per distance ratio (seconds per meter)
-            time_per_meter = time_s / distance_m if distance_m > 0 else 0.0
-            
             # Calculate signal density (signals per 100m)
             signal_density_per_100m = (signals / distance_m * 100) if distance_m > 0 else 0.0
             
-            # Calculate crossing density (crossings per 100m)
-            crossing_density_per_100m = (crossings / distance_m * 100) if distance_m > 0 else 0.0
-            
-            # Calculate safety penalty ratio (penalties / distance)
-            safety_penalty_ratio = safety_penalties / distance_m if distance_m > 0 else 0.0
-            
-            # Calculate cost efficiency (total_cost / distance)
-            cost_efficiency = total_cost / distance_m if distance_m > 0 else 0.0
+            # Additional derived ratios
+            expansions_total = nxf + nxb
+            edges_scanned_total = esf + esb
             
             results.append({
                 'neighborhood': neighborhood,
                 'building_id': building_id,
                 'algorithm': algorithm,
                 'distance_meters': distance_m,
-                'time_seconds': time_s,
                 'time_minutes': time_s / 60.0,
+                'time_seconds': time_s,
                 'num_traffic_signals': signals,
                 'num_crossings': crossings,
                 'safety_penalties': safety_penalties,
@@ -168,14 +165,16 @@ def process_json_file(file_path: str, target_coords: Tuple[float, float]) -> Lis
                 'detour_factor': detour_factor,
                 'straight_line_distance': straight_line_dist,
                 'num_path_nodes': num_path_nodes,
-                'avg_walking_speed_ms': avg_walking_speed,
                 'avg_walking_speed_kmh': avg_walking_speed * 3.6,
-                'time_per_meter': time_per_meter,
                 'signal_density_per_100m': signal_density_per_100m,
-                'crossing_density_per_100m': crossing_density_per_100m,
-                'safety_penalty_ratio': safety_penalty_ratio,
-                'cost_efficiency': cost_efficiency
-            })
+                'nodes_expanded_forward': nxf,
+                'nodes_expanded_backward': nxb,
+                'edges_scanned_forward': esf,
+                'edges_scanned_backward': esb,
+                'expansions_total': expansions_total,
+                'edges_scanned_total': edges_scanned_total,
+
+                                                                                                })
     
     return results
 
@@ -199,54 +198,32 @@ def generate_summary_statistics(df: pd.DataFrame) -> pd.DataFrame:
             
             # Distance metrics
             'distance_meters_mean': group['distance_meters'].mean(),
-            'distance_meters_std': group['distance_meters'].std() if len(group) > 1 else np.nan,
-            'distance_meters_min': group['distance_meters'].min(),
-            'distance_meters_max': group['distance_meters'].max(),
             
             # Time metrics
-            'time_seconds_mean': group['time_seconds'].mean(),
-            'time_seconds_std': group['time_seconds'].std() if len(group) > 1 else np.nan,
-            'time_seconds_min': group['time_seconds'].min(),
-            'time_seconds_max': group['time_seconds'].max(),
             'time_minutes_mean': group['time_minutes'].mean(),
             
             # Infrastructure metrics
             'traffic_signals_mean': group['num_traffic_signals'].mean(),
-            'traffic_signals_sum': group['num_traffic_signals'].sum(),
-            'traffic_signals_max': group['num_traffic_signals'].max(),
             'crossings_mean': group['num_crossings'].mean(),
-            'crossings_sum': group['num_crossings'].sum(),
-            'crossings_max': group['num_crossings'].max(),
             
-            # Safety and cost metrics
-            'safety_penalties_mean': group['safety_penalties'].mean(),
-            'safety_penalties_std': group['safety_penalties'].std() if len(group) > 1 else np.nan,
-            'safety_penalties_max': group['safety_penalties'].max(),
-            'total_cost_mean': group['total_cost'].mean(),
-            'total_cost_std': group['total_cost'].std() if len(group) > 1 else np.nan,
             
             # Route quality metrics
             'detour_factor_mean': group['detour_factor'].mean(),
-            'detour_factor_std': group['detour_factor'].std() if len(group) > 1 else np.nan,
-            'detour_factor_max': group['detour_factor'].max(),
             'straight_line_distance_mean': group['straight_line_distance'].mean(),
             
             # Path complexity metrics
             'num_path_nodes_mean': group['num_path_nodes'].mean(),
-            'num_path_nodes_max': group['num_path_nodes'].max(),
             
             # Speed and efficiency metrics
-            'avg_walking_speed_ms_mean': group['avg_walking_speed_ms'].mean(),
             'avg_walking_speed_kmh_mean': group['avg_walking_speed_kmh'].mean(),
-            'time_per_meter_mean': group['time_per_meter'].mean(),
-            'cost_efficiency_mean': group['cost_efficiency'].mean(),
-            
+
             # Density metrics (per 100m)
             'signal_density_per_100m_mean': group['signal_density_per_100m'].mean(),
-            'signal_density_per_100m_max': group['signal_density_per_100m'].max(),
-            'crossing_density_per_100m_mean': group['crossing_density_per_100m'].mean(),
-            'crossing_density_per_100m_max': group['crossing_density_per_100m'].max(),
-            'safety_penalty_ratio_mean': group['safety_penalty_ratio'].mean()
+
+            # Search diagnostics
+            'expansions_total_mean': group['expansions_total'].mean() if 'expansions_total' in group else np.nan,
+            'edges_scanned_total_mean': group['edges_scanned_total'].mean() if 'edges_scanned_total' in group else np.nan,
+
         }
         
         summary_stats.append(stats)
